@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gem" x1="16" y1="14" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#73A2FF"/>
+      <stop offset="1" stop-color="#245DCC"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="24" y1="22" x2="42" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#CFE0FF"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 8L47 18V36L32 48L17 36V18L32 8Z" fill="url(#gem)"/>
+  <path d="M32 14L41 20V34L32 40L23 34V20L32 14Z" fill="url(#spark)"/>
+  <path d="M32 21L36.8 25.8L32 30.6L27.2 25.8L32 21Z" fill="#2A63D0"/>
+  <circle cx="44.5" cy="15.5" r="2.5" fill="#9FC0FF"/>
+  <circle cx="18.5" cy="45.5" r="2.5" fill="#9FC0FF"/>
+</svg>

@@ -1,0 +1,32 @@
+﻿-- MySQL 建表脚本：可直接执行
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS items (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(200) NOT NULL,
+  category VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS ratings (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  item_id BIGINT NOT NULL,
+  score DOUBLE NOT NULL,
+  rated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_r_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_r_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+  CONSTRAINT uk_user_item UNIQUE (user_id, item_id),
+  CONSTRAINT ck_score CHECK (score >= 0 AND score <= 5)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- 常用查询索引
+ALTER TABLE ratings ADD INDEX idx_r_item_id (item_id);
+ALTER TABLE ratings ADD INDEX idx_r_rated_at (rated_at);
+ALTER TABLE ratings ADD INDEX idx_r_user_rated_at (user_id, rated_at);
+ALTER TABLE items ADD INDEX idx_items_name (name);
+ALTER TABLE items ADD INDEX idx_items_category (category);

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>基于协同过滤的商品推荐系统 - 商品管理</title>
+  <link rel="stylesheet" href="/admin/app.css"/>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <h1 class="title">商品管理</h1>
+      <p class="subtitle">支持商品检索、新增、更新和删除操作</p>
+    </div>
+    <nav class="nav">
+      <a href="/admin/index.html">推荐管理</a>
+      <a href="/admin/behavior.html">行为采集</a>
+      <a href="/admin/users.html">用户管理</a>
+      <button id="themeToggle" class="ghost" type="button">切换暗色</button>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h3>查询与新增</h3>
+    <div class="toolbar">
+      <label for="keyword">商品关键字</label>
+      <input id="keyword" placeholder="输入商品名后查询"/>
+      <button id="searchBtn" class="ghost">查询</button>
+      <label for="newName">新增商品名</label>
+      <input id="newName" placeholder="请输入商品名"/>
+      <label for="newCategory">类别</label>
+      <input id="newCategory" placeholder="例如 toy / books"/>
+      <button id="createBtn">新增商品</button>
+      <span id="msg" class="status"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>商品列表</h3>
+    <table>
+      <thead><tr><th>ID</th><th>商品名</th><th>类别</th><th>图片</th><th>创建时间</th><th>操作</th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+    <div class="pager">
+      <div class="pager-info" id="pagerInfo">暂无数据</div>
+      <div class="pager-controls">
+        <div class="actions compact">
+          <label for="pageSize">每页</label>
+          <select id="pageSize">
+            <option value="10">10</option>
+            <option value="12" selected>12</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <button id="prevPage" class="ghost" type="button">上一页</button>
+        <div class="page-numbers" id="pageNumbers"></div>
+        <button id="nextPage" class="ghost" type="button">下一页</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let pageSize = 12;
+  let rows = [];
+  let page = 1;
+  function initTheme() {
+    const key = 'theme';
+    const saved = localStorage.getItem(key) || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    $('themeToggle').textContent = saved === 'dark' ? '切换亮色' : '切换暗色';
+    $('themeToggle').addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem(key, next);
+      $('themeToggle').textContent = next === 'dark' ? '切换亮色' : '切换暗色';
+    });
+  }
+  function setMsg(text, cls) {
+    $('msg').textContent = text || '';
+    $('msg').className = 'status ' + (cls || '');
+  }
+  function renderItems() {
+    const body = $('body');
+    body.innerHTML = '';
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.max(1, Math.min(page, totalPages));
+    const start = (page - 1) * pageSize;
+    const pageRows = rows.slice(start, start + pageSize);
+    pageRows.forEach(i => {
+      const tr = document.createElement('tr');
+      const imgUrl = i.imageUrl || '/images/placeholder.svg';
+      tr.innerHTML = `<td>${i.id}</td>
+                      <td><input data-name-id="${i.id}" value="${i.name || ''}"/></td>
+                      <td><input data-category-id="${i.id}" value="${i.category || ''}"/></td>
+                      <td>
+                        <div class="img-cell">
+                          <img src="${imgUrl}" alt="商品图"/>
+                          <input type="file" data-upload-id="${i.id}" accept="image/*"/>
+                        </div>
+                      </td>
+                      <td>${i.createdAt || ''}</td>
+                      <td class="actions">
+                        <button data-op="save" data-id="${i.id}">保存</button>
+                        <button data-op="del" data-id="${i.id}" class="ghost">删除</button>
+                      </td>`;
+      body.appendChild(tr);
+    });
+    $('pagerInfo').textContent = rows.length === 0 ? '暂无数据' : `第 ${page}/${totalPages} 页，共 ${rows.length} 条`;
+    $('prevPage').disabled = page <= 1;
+    $('nextPage').disabled = page >= totalPages;
+    renderPageNumbers(totalPages);
+  }
+  function renderPageNumbers(totalPages) {
+    const wrap = $('pageNumbers');
+    wrap.innerHTML = '';
+    if (rows.length === 0) return;
+    let start = Math.max(1, page - 2);
+    let end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    for (let i = start; i <= end; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = i === page ? 'active' : 'ghost';
+      btn.textContent = i;
+      btn.addEventListener('click', () => {
+        page = i;
+        renderItems();
+      });
+      wrap.appendChild(btn);
+    }
+  }
+  async function loadItems() {
+    const keyword = encodeURIComponent($('keyword').value || '');
+    const resp = await fetch('/api/admin/items?keyword=' + keyword);
+    rows = await resp.json();
+    page = 1;
+    renderItems();
+  }
+  async function createItem() {
+    const name = $('newName').value;
+    const category = $('newCategory').value;
+    const resp = await fetch('/api/admin/items', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, category})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '新增失败', 'err');
+      return;
+    }
+    $('newName').value = '';
+    $('newCategory').value = '';
+    setMsg('新增成功', 'ok');
+    await loadItems();
+  }
+  async function saveItem(id) {
+    const nameInput = document.querySelector(`input[data-name-id="${id}"]`);
+    const categoryInput = document.querySelector(`input[data-category-id="${id}"]`);
+    const name = nameInput ? nameInput.value : '';
+    const category = categoryInput ? categoryInput.value : '';
+    const resp = await fetch('/api/admin/items/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, category})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '保存失败', 'err');
+      return;
+    }
+    setMsg('保存成功', 'ok');
+    await loadItems();
+  }
+  async function deleteItem(id) {
+    const resp = await fetch('/api/admin/items/' + id, {method: 'DELETE'});
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '删除失败', 'err');
+      return;
+    }
+    setMsg('删除成功', 'ok');
+    await loadItems();
+  }
+  async function uploadItemImage(id, file) {
+    if (!file) return;
+    const data = new FormData();
+    data.append('file', file);
+    const resp = await fetch('/api/admin/items/' + id + '/image', {
+      method: 'POST',
+      body: data
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '上传失败', 'err');
+      return;
+    }
+    setMsg('图片已更新', 'ok');
+    await loadItems();
+  }
+  $('searchBtn').addEventListener('click', loadItems);
+  $('createBtn').addEventListener('click', createItem);
+  $('body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const id = btn.getAttribute('data-id');
+    const op = btn.getAttribute('data-op');
+    if (op === 'save') await saveItem(id);
+    if (op === 'del') await deleteItem(id);
+  });
+  $('body').addEventListener('change', async (e) => {
+    const input = e.target.closest('input[type="file"][data-upload-id]');
+    if (!input) return;
+    const id = input.getAttribute('data-upload-id');
+    const file = input.files && input.files[0];
+    await uploadItemImage(id, file);
+    input.value = '';
+  });
+  $('prevPage').addEventListener('click', () => {
+    page--;
+    renderItems();
+  });
+  $('nextPage').addEventListener('click', () => {
+    page++;
+    renderItems();
+  });
+  $('pageSize').addEventListener('change', (e) => {
+    pageSize = Number(e.target.value) || 12;
+    page = 1;
+    renderItems();
+  });
+  initTheme();
+  renderItems();
+  loadItems();
+</script>
+</body>
+</html>

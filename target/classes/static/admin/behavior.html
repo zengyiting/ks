@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>基于协同过滤的商品推荐系统 - 用户行为采集</title>
+  <link rel="stylesheet" href="/admin/app.css"/>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <h1 class="title">用户行为采集</h1>
+      <p class="subtitle">搜索用户和商品，提交评分行为，并查看历史评分轨迹</p>
+    </div>
+    <nav class="nav">
+      <a href="/admin/index.html">推荐管理</a>
+      <a href="/admin/users.html">用户管理</a>
+      <a href="/admin/items.html">商品管理</a>
+      <button id="themeToggle" class="ghost" type="button">切换暗色</button>
+    </nav>
+  </header>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h3>选择对象</h3>
+      <div class="toolbar">
+        <label for="userKeyword">用户搜索</label>
+        <input id="userKeyword" placeholder="用户名关键字，可留空"/>
+        <button id="loadUsers">加载用户</button>
+      </div>
+      <div class="toolbar">
+        <label for="userSelect">用户列表</label>
+        <select id="userSelect"></select>
+      </div>
+      <div class="toolbar">
+        <label for="itemKeyword">商品搜索</label>
+        <input id="itemKeyword" placeholder="商品名关键字，可留空"/>
+        <button id="loadItems">加载商品</button>
+      </div>
+      <div class="toolbar">
+        <label for="itemSelect">商品列表</label>
+        <select id="itemSelect"></select>
+      </div>
+    </div>
+    <div class="card">
+      <h3>行为写入</h3>
+      <div class="toolbar">
+        <label for="score">评分</label>
+        <input id="score" type="number" min="0" max="5" step="0.5" value="4"/>
+        <button id="submitRating">提交评分行为</button>
+        <button id="eventView" class="ghost" type="button">记录浏览</button>
+        <button id="eventClick" class="ghost" type="button">记录点击</button>
+        <button id="eventFavorite" class="ghost" type="button">记录收藏</button>
+        <button id="eventCart" class="ghost" type="button">记录加购</button>
+        <button id="refreshRatings" class="ghost" type="button">刷新当前用户行为</button>
+      </div>
+      <span id="msg" class="status"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>用户历史评分</h3>
+    <table>
+      <thead>
+      <tr><th>itemId</th><th>商品名</th><th>类别</th><th>评分</th><th>时间</th></tr>
+      </thead>
+      <tbody id="ratingBody"></tbody>
+    </table>
+    <div class="pager">
+      <div class="pager-info" id="pagerInfo">暂无数据</div>
+      <div class="pager-controls">
+        <div class="actions compact">
+          <label for="pageSize">每页</label>
+          <select id="pageSize">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <button id="prevPage" class="ghost" type="button">上一页</button>
+        <div class="page-numbers" id="pageNumbers"></div>
+        <button id="nextPage" class="ghost" type="button">下一页</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let pageSize = 10;
+  let rows = [];
+  let page = 1;
+  function initTheme() {
+    const key = 'theme';
+    const saved = localStorage.getItem(key) || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    $('themeToggle').textContent = saved === 'dark' ? '切换亮色' : '切换暗色';
+    $('themeToggle').addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem(key, next);
+      $('themeToggle').textContent = next === 'dark' ? '切换亮色' : '切换暗色';
+    });
+  }
+  function setMsg(text, cls) {
+    const m = $('msg');
+    m.className = 'status ' + (cls || '');
+    m.textContent = text || '';
+  }
+  function renderRows() {
+    const body = $('ratingBody');
+    body.innerHTML = '';
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.max(1, Math.min(page, totalPages));
+    const start = (page - 1) * pageSize;
+    const pageRows = rows.slice(start, start + pageSize);
+    pageRows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.itemId}</td><td>${r.itemName || ''}</td><td>${r.category || ''}</td><td>${Number(r.score).toFixed(1)}</td><td>${r.ratedAt || ''}</td>`;
+      body.appendChild(tr);
+    });
+    $('pagerInfo').textContent = rows.length === 0 ? '暂无数据' : `第 ${page}/${totalPages} 页，共 ${rows.length} 条`;
+    $('prevPage').disabled = page <= 1;
+    $('nextPage').disabled = page >= totalPages;
+    renderPageNumbers(totalPages);
+  }
+  function renderPageNumbers(totalPages) {
+    const wrap = $('pageNumbers');
+    wrap.innerHTML = '';
+    if (rows.length === 0) return;
+    let start = Math.max(1, page - 2);
+    let end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    for (let i = start; i <= end; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = i === page ? 'active' : 'ghost';
+      btn.textContent = i;
+      btn.addEventListener('click', () => {
+        page = i;
+        renderRows();
+      });
+      wrap.appendChild(btn);
+    }
+  }
+  function selectedValue(selectId) {
+    const sel = $(selectId);
+    if (!sel || sel.selectedIndex < 0) return null;
+    return Number(sel.options[sel.selectedIndex].value);
+  }
+  async function loadUsers() {
+    const keyword = encodeURIComponent($('userKeyword').value || '');
+    const resp = await fetch('/api/behaviors/users?keyword=' + keyword);
+    const data = await resp.json();
+    const sel = $('userSelect');
+    sel.innerHTML = '';
+    data.forEach(u => {
+      const op = document.createElement('option');
+      op.value = u.id;
+      op.textContent = `${u.id} - ${u.username}`;
+      sel.appendChild(op);
+    });
+  }
+  async function loadItems() {
+    const keyword = encodeURIComponent($('itemKeyword').value || '');
+    const resp = await fetch('/api/behaviors/items?keyword=' + keyword);
+    const data = await resp.json();
+    const sel = $('itemSelect');
+    sel.innerHTML = '';
+    data.forEach(i => {
+      const op = document.createElement('option');
+      op.value = i.id;
+      op.textContent = `${i.id} - ${i.name} (${i.category || '-'})`;
+      sel.appendChild(op);
+    });
+  }
+  async function refreshRatings() {
+    const userId = selectedValue('userSelect');
+    if (!userId) {
+      setMsg('请先选择用户', 'err');
+      return;
+    }
+    const resp = await fetch(`/api/behaviors/users/${userId}/ratings`);
+    rows = await resp.json();
+    page = 1;
+    renderRows();
+  }
+  async function submitRating() {
+    const userId = selectedValue('userSelect');
+    const itemId = selectedValue('itemSelect');
+    const score = Number($('score').value);
+    if (!userId || !itemId || Number.isNaN(score)) {
+      setMsg('请先选择用户、商品并填写评分', 'err');
+      return;
+    }
+    const resp = await fetch('/api/behaviors/ratings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({userId, itemId, score})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '提交失败', 'err');
+      return;
+    }
+    const row = await resp.json();
+    setMsg(`已记录行为：item ${row.itemId} 评分 ${Number(row.score).toFixed(1)}`, 'ok');
+    await refreshRatings();
+  }
+  async function recordEvent(action) {
+    const userId = selectedValue('userSelect');
+    const itemId = selectedValue('itemSelect');
+    if (!userId || !itemId) {
+      setMsg('请先选择用户和商品', 'err');
+      return;
+    }
+    const resp = await fetch('/api/behaviors/events', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({userId, itemId, action})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '行为提交失败', 'err');
+      return;
+    }
+    const row = await resp.json();
+    setMsg(row.message || `已记录行为：${action}`, 'ok');
+    await refreshRatings();
+  }
+  $('loadUsers').addEventListener('click', loadUsers);
+  $('loadItems').addEventListener('click', loadItems);
+  $('refreshRatings').addEventListener('click', refreshRatings);
+  $('submitRating').addEventListener('click', submitRating);
+  $('eventView').addEventListener('click', () => recordEvent('view'));
+  $('eventClick').addEventListener('click', () => recordEvent('click'));
+  $('eventFavorite').addEventListener('click', () => recordEvent('favorite'));
+  $('eventCart').addEventListener('click', () => recordEvent('cart'));
+  $('prevPage').addEventListener('click', () => {
+    page--;
+    renderRows();
+  });
+  $('nextPage').addEventListener('click', () => {
+    page++;
+    renderRows();
+  });
+  $('pageSize').addEventListener('change', (e) => {
+    pageSize = Number(e.target.value) || 10;
+    page = 1;
+    renderRows();
+  });
+  initTheme();
+  renderRows();
+  loadUsers().then(loadItems);
+</script>
+</body>
+</html>

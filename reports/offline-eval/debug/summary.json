@@ -1,0 +1,18 @@
+{
+  "evaluable_users": 9045,
+  "zero_hit_users": 6948,
+  "zero_hit_fraction": 0.7681592039800995,
+  "debug_written": 10,
+  "sample_failed_user_ids": [
+    95,
+    147,
+    404,
+    539,
+    570,
+    767,
+    1112,
+    1205,
+    1247,
+    1258
+  ]
+}

@@ -1,0 +1,309 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Offline Evaluation Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    h1 { margin-bottom: 8px; }
+    .toolbar { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; }
+    #chart { border: 1px solid #ddd; width: 960px; height: 460px; }
+    table { border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Offline Evaluation Results</h1>
+  <div class="toolbar">
+    <label>Metric:
+      <select id="metric">
+        <option value="precisionAtK">Precision@K</option>
+        <option value="recallAtK">Recall@K</option>
+        <option value="ndcgAtK">NDCG@K</option>
+        <option value="coverage">Coverage</option>
+      </select>
+    </label>
+  </div>
+  <canvas id="chart" width="960" height="460"></canvas>
+  <table id="table"></table>
+  <script>
+    const rows = [
+    {
+        "algorithm":  "hybrid",
+        "topK":  5,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.00939330312741746,
+        "recallAtK":  0.025623212723366085,
+        "ndcgAtK":  0.019695733736287475,
+        "coverage":  0.69901585565883,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "hybrid",
+        "topK":  10,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0074483368327992469,
+        "recallAtK":  0.039361391820002013,
+        "ndcgAtK":  0.024508874381868835,
+        "coverage":  0.81478950246036086,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "hybrid",
+        "topK":  20,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0058514753011381778,
+        "recallAtK":  0.060897253210319323,
+        "ndcgAtK":  0.031413500259966656,
+        "coverage":  0.87055768179332971,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "hybrid",
+        "topK":  30,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0048587320882602231,
+        "recallAtK":  0.076303484728828516,
+        "ndcgAtK":  0.035144264100008406,
+        "coverage":  0.89338436303991253,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "item",
+        "topK":  5,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.00693999336943312,
+        "recallAtK":  0.019706636437623212,
+        "ndcgAtK":  0.014689729778376881,
+        "coverage":  0.38285948605795522,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "item",
+        "topK":  10,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0061995800640955341,
+        "recallAtK":  0.033378893030432413,
+        "ndcgAtK":  0.019846872844439079,
+        "coverage":  0.42523236741388737,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "item",
+        "topK":  20,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0047519062879875984,
+        "recallAtK":  0.04966182663808013,
+        "ndcgAtK":  0.024744576530481521,
+        "coverage":  0.45297977036632042,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "item",
+        "topK":  30,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0038678306995248578,
+        "recallAtK":  0.05845721437368142,
+        "ndcgAtK":  0.027115069509597221,
+        "coverage":  0.46350464734827779,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "user",
+        "topK":  5,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0025196154271190136,
+        "recallAtK":  0.0068679307753327559,
+        "ndcgAtK":  0.0046651934348461641,
+        "coverage":  0.29688354291962821,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "user",
+        "topK":  10,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0028069399933694423,
+        "recallAtK":  0.014683104014915266,
+        "ndcgAtK":  0.00752742592254543,
+        "coverage":  0.38313285948605791,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "user",
+        "topK":  20,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0027958890485136694,
+        "recallAtK":  0.029102253467430509,
+        "ndcgAtK":  0.011793321234339408,
+        "coverage":  0.55576817933296885,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    },
+    {
+        "algorithm":  "user",
+        "topK":  30,
+        "testRatio":  0.2,
+        "relevance":  1.5,
+        "precisionAtK":  0.0026043393376800664,
+        "recallAtK":  0.039917992315262808,
+        "ndcgAtK":  0.014563483997498992,
+        "coverage":  0.71610169491525422,
+        "users":  9049,
+        "trainSize":  52590,
+        "testSize":  17262,
+        "evaluableUsers":  9049
+    }
+];
+    const metricSelect = document.getElementById("metric");
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+    const colors = { user: "#2563eb", item: "#16a34a", hybrid: "#dc2626" };
+    const order = ["user", "item", "hybrid"];
+
+    function grouped(metric) {
+      const g = {};
+      for (const r of rows) {
+        if (!g[r.algorithm]) g[r.algorithm] = [];
+        g[r.algorithm].push({ k: Number(r.topK), v: Number(r[metric]) });
+      }
+      for (const k of Object.keys(g)) g[k].sort((a, b) => a.k - b.k);
+      return g;
+    }
+
+    function renderTable(metric) {
+      const t = document.getElementById("table");
+      const header = "<tr><th>algorithm</th><th>topK</th><th>" + metric + "</th><th>users</th><th>trainSize</th><th>testSize</th></tr>";
+      const body = rows
+        .map(r => "<tr><td>" + r.algorithm + "</td><td>" + r.topK + "</td><td>" + Number(r[metric]).toFixed(4) + "</td><td>" + r.users + "</td><td>" + r.trainSize + "</td><td>" + r.testSize + "</td></tr>")
+        .join("");
+      t.innerHTML = header + body;
+    }
+
+    function draw(metric) {
+      const g = grouped(metric);
+      const all = rows.map(r => Number(r[metric]));
+      const minV = Math.min(...all, 0);
+      const maxV = Math.max(...all, 1);
+      const xMin = Math.min(...rows.map(r => Number(r.topK)));
+      const xMax = Math.max(...rows.map(r => Number(r.topK)));
+      const pad = 50;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const y = pad + (h * i) / 5;
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + w, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "#111827";
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, pad + h);
+      ctx.lineTo(pad + w, pad + h);
+      ctx.stroke();
+
+      function sx(x) {
+        if (xMax === xMin) return pad + w / 2;
+        return pad + ((x - xMin) / (xMax - xMin)) * w;
+      }
+      function sy(y) {
+        if (maxV === minV) return pad + h / 2;
+        return pad + h - ((y - minV) / (maxV - minV)) * h;
+      }
+
+      for (const algo of order) {
+        const points = g[algo] || [];
+        if (points.length === 0) continue;
+        ctx.strokeStyle = colors[algo];
+        ctx.fillStyle = colors[algo];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach((p, i) => {
+          const x = sx(p.k), y = sy(p.v);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        points.forEach(p => {
+          const x = sx(p.k), y = sy(p.v);
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "12px Arial";
+      ctx.fillText(metric, pad, 18);
+      ctx.fillText("topK", canvas.width - 50, canvas.height - 12);
+      let ly = 20;
+      for (const algo of order) {
+        ctx.fillStyle = colors[algo];
+        ctx.fillRect(canvas.width - 130, ly - 10, 10, 10);
+        ctx.fillStyle = "#111827";
+        ctx.fillText(algo, canvas.width - 115, ly);
+        ly += 18;
+      }
+    }
+
+    function render() {
+      const metric = metricSelect.value;
+      draw(metric);
+      renderTable(metric);
+    }
+
+    metricSelect.addEventListener("change", render);
+    render();
+  </script>
+</body>
+</html>

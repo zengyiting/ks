@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>基于协同过滤的商品推荐系统 - 用户管理</title>
+  <link rel="stylesheet" href="/admin/app.css"/>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <h1 class="title">用户管理</h1>
+      <p class="subtitle">支持用户检索、新增、更新、禁用与删除操作</p>
+    </div>
+    <nav class="nav">
+      <a href="/admin/index.html">推荐管理</a>
+      <a href="/admin/behavior.html">行为采集</a>
+      <a href="/admin/items.html">商品管理</a>
+      <button id="themeToggle" class="ghost" type="button">切换暗色</button>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h3>查询与新增</h3>
+    <div class="toolbar">
+      <label for="keyword">用户名关键字</label>
+      <input id="keyword" placeholder="输入关键字后点击查询"/>
+      <button id="searchBtn" class="ghost">查询</button>
+      <label for="newUsername">新增用户名</label>
+      <input id="newUsername" placeholder="请输入新用户名"/>
+      <button id="createBtn">新增用户</button>
+      <span id="msg" class="status"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>用户列表</h3>
+    <table>
+      <thead><tr><th>ID</th><th>用户名</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+    <div class="pager">
+      <div class="pager-info" id="pagerInfo">暂无数据</div>
+      <div class="pager-controls">
+        <div class="actions compact">
+          <label for="pageSize">每页</label>
+          <select id="pageSize">
+            <option value="10">10</option>
+            <option value="12" selected>12</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <button id="prevPage" class="ghost" type="button">上一页</button>
+        <div class="page-numbers" id="pageNumbers"></div>
+        <button id="nextPage" class="ghost" type="button">下一页</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let pageSize = 12;
+  let rows = [];
+  let page = 1;
+  function initTheme() {
+    const key = 'theme';
+    const saved = localStorage.getItem(key) || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    $('themeToggle').textContent = saved === 'dark' ? '切换亮色' : '切换暗色';
+    $('themeToggle').addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem(key, next);
+      $('themeToggle').textContent = next === 'dark' ? '切换亮色' : '切换暗色';
+    });
+  }
+  function setMsg(text, cls) {
+    $('msg').textContent = text || '';
+    $('msg').className = 'status ' + (cls || '');
+  }
+  function renderUsers() {
+    const body = $('body');
+    body.innerHTML = '';
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.max(1, Math.min(page, totalPages));
+    const start = (page - 1) * pageSize;
+    const pageRows = rows.slice(start, start + pageSize);
+    pageRows.forEach(u => {
+      const tr = document.createElement('tr');
+      tr.className = u.disabled ? 'is-disabled' : '';
+      const statusTag = u.disabled
+        ? '<span class="tag off">已禁用</span>'
+        : '<span class="tag ok">正常</span>';
+      const toggleLabel = u.disabled ? '启用' : '禁用';
+      tr.innerHTML = `<td>${u.id}</td>
+                      <td><input data-id="${u.id}" value="${u.username || ''}"/></td>
+                      <td>${statusTag}</td>
+                      <td>${u.createdAt || ''}</td>
+                      <td class="actions">
+                        <button data-op="save" data-id="${u.id}">保存</button>
+                        <button data-op="toggle" data-id="${u.id}" data-disabled="${u.disabled}">${toggleLabel}</button>
+                        <button data-op="del" data-id="${u.id}" class="ghost">删除</button>
+                      </td>`;
+      body.appendChild(tr);
+    });
+    $('pagerInfo').textContent = rows.length === 0 ? '暂无数据' : `第 ${page}/${totalPages} 页，共 ${rows.length} 条`;
+    $('prevPage').disabled = page <= 1;
+    $('nextPage').disabled = page >= totalPages;
+    renderPageNumbers(totalPages);
+  }
+  function renderPageNumbers(totalPages) {
+    const wrap = $('pageNumbers');
+    wrap.innerHTML = '';
+    if (rows.length === 0) return;
+    let start = Math.max(1, page - 2);
+    let end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    for (let i = start; i <= end; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = i === page ? 'active' : 'ghost';
+      btn.textContent = i;
+      btn.addEventListener('click', () => {
+        page = i;
+        renderUsers();
+      });
+      wrap.appendChild(btn);
+    }
+  }
+  async function loadUsers() {
+    const keyword = encodeURIComponent($('keyword').value || '');
+    const resp = await fetch('/api/admin/users?keyword=' + keyword);
+    rows = await resp.json();
+    page = 1;
+    renderUsers();
+  }
+  async function createUser() {
+    const username = $('newUsername').value;
+    const resp = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '新增失败', 'err');
+      return;
+    }
+    $('newUsername').value = '';
+    setMsg('新增成功，默认密码：123456', 'ok');
+    await loadUsers();
+  }
+  async function saveUser(id) {
+    const input = document.querySelector(`input[data-id="${id}"]`);
+    const username = input ? input.value : '';
+    const resp = await fetch('/api/admin/users/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '保存失败', 'err');
+      return;
+    }
+    setMsg('保存成功', 'ok');
+    await loadUsers();
+  }
+  async function deleteUser(id) {
+    const resp = await fetch('/api/admin/users/' + id, {method: 'DELETE'});
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '删除失败', 'err');
+      return;
+    }
+    setMsg('删除成功', 'ok');
+    await loadUsers();
+  }
+  async function toggleUser(id, disabled) {
+    const resp = await fetch('/api/admin/users/' + id + '/disabled', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({disabled})
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '更新状态失败', 'err');
+      return;
+    }
+    setMsg(disabled ? '已禁用' : '已启用', 'ok');
+    await loadUsers();
+  }
+  $('searchBtn').addEventListener('click', loadUsers);
+  $('createBtn').addEventListener('click', createUser);
+  $('body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const id = btn.getAttribute('data-id');
+    const op = btn.getAttribute('data-op');
+    if (op === 'save') await saveUser(id);
+    if (op === 'toggle') {
+      const cur = btn.getAttribute('data-disabled') === 'true';
+      await toggleUser(id, !cur);
+    }
+    if (op === 'del') await deleteUser(id);
+  });
+  $('prevPage').addEventListener('click', () => {
+    page--;
+    renderUsers();
+  });
+  $('nextPage').addEventListener('click', () => {
+    page++;
+    renderUsers();
+  });
+  $('pageSize').addEventListener('change', (e) => {
+    pageSize = Number(e.target.value) || 12;
+    page = 1;
+    renderUsers();
+  });
+  initTheme();
+  renderUsers();
+  loadUsers();
+</script>
+</body>
+</html>

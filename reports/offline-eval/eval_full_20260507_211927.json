@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-05-07T21:19:27.609322",
+  "dataset": "ml-1m",
+  "total_users": 6040,
+  "total_ratings": 1000209,
+  "train_size": 797758,
+  "test_size": 202451,
+  "test_ratio": 0.2,
+  "top_n": 10,
+  "relevance_threshold": 4.0,
+  "algorithms": {
+    "USER_BASED": {
+      "precisionAtK": 0.011083,
+      "recallAtK": 0.004125,
+      "ndcgAtK": 0.011116,
+      "coverage": 0.638694,
+      "evaluatedUsers": 6027,
+      "elapsedSeconds": 842.5
+    },
+    "ITEM_BASED": {
+      "precisionAtK": 0.005376,
+      "recallAtK": 0.003327,
+      "ndcgAtK": 0.005264,
+      "coverage": 0.862655,
+      "evaluatedUsers": 6027,
+      "elapsedSeconds": 60.36
+    },
+    "BEHAVIOR_BASED": {
+      "precisionAtK": 0.005542,
+      "recallAtK": 0.003882,
+      "ndcgAtK": 0.005721,
+      "coverage": 0.860496,
+      "evaluatedUsers": 6027,
+      "elapsedSeconds": 1038.71
+    },
+    "HYBRID": {
+      "precisionAtK": 0.040601,
+      "recallAtK": 0.020064,
+      "ndcgAtK": 0.031247,
+      "coverage": 0.832974,
+      "evaluatedUsers": 6027,
+      "elapsedSeconds": 2119.6
+    }
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "user": 1112,
+  "train_items": [
+    {
+      "item": 4145813,
+      "score": 4.5,
+      "ts": 1512099831
+    },
+    {
+      "item": 4145813,
+      "score": 4.5,
+      "ts": 1512106798
+    },
+    {
+      "item": 4145813,
+      "score": 4.5,
+      "ts": 1512107048
+    },
+    {
+      "item": 4756105,
+      "score": 4.5,
+      "ts": 1512177590
+    }
+  ],
+  "test_items": [
+    {
+      "item": 4756105,
+      "score": 4.5,
+      "ts": 1512178117,
+      "relevant": true
+    },
+    {
+      "item": 3848953,
+      "score": 4.5,
+      "ts": 1512178216,
+      "relevant": true
+    }
+  ],
+  "relevant_items": [
+    4756105,
+    3848953
+  ],
+  "neighbors_count": 50,
+  "top_neighbors": [
+    {
+      "neighbor": 308425,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 875274,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 634709,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 728763,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 738906,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 86991,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 902694,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 584111,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 109028,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 444339,
+      "sim": 0.6666666666666666,
+      "overlap": 2,
+      "common_items": [
+        4756105,
+        4145813
+      ]
+    }
+  ],
+  "recommendations": [],
+  "popular_fallback_used": false
+}

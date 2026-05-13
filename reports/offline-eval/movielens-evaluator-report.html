@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>MovieLens-100k 离线评估报告</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    h1 { margin-bottom: 8px; }
+    .subtitle { color: #666; margin-bottom: 16px; }
+    .toolbar { margin-bottom: 16px; display: flex; gap: 12px; align-items: center; }
+    #chart { border: 1px solid #ddd; width: 960px; height: 460px; }
+    table { border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    .info { background: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>MovieLens-100k 离线评估报告</h1>
+  <p class="subtitle">纯内存评估器 | 数据集: ml-100k | 评估时间: 2026-05-09</p>
+
+  <div class="info">
+    <strong>评估配置:</strong> 测试集比例 20% | 相关性阈值 4.0 | K=10 |
+    可评估用户: 929 | 训练集: 随机80% | 测试集: 随机20%中评分>=4的物品
+  </div>
+
+  <div class="toolbar">
+    <label>指标:
+      <select id="metric">
+        <option value="precisionAtK">Precision@K</option>
+        <option value="recallAtK">Recall@K</option>
+        <option value="ndcgAtK">NDCG@K</option>
+        <option value="coverage">Coverage</option>
+      </select>
+    </label>
+  </div>
+  <canvas id="chart" width="960" height="460"></canvas>
+  <table id="table"></table>
+
+  <script>
+    const rows = [
+    {
+        "algorithm": "User-Based CF",
+        "topK": 5,
+        "precisionAtK": 0.0192,
+        "recallAtK": 0.0089,
+        "ndcgAtK": 0.0213,
+        "coverage": 0.3821,
+        "users": 929
+    },
+    {
+        "algorithm": "User-Based CF",
+        "topK": 10,
+        "precisionAtK": 0.0219,
+        "recallAtK": 0.0150,
+        "ndcgAtK": 0.0246,
+        "coverage": 0.4512,
+        "users": 929
+    },
+    {
+        "algorithm": "User-Based CF",
+        "topK": 20,
+        "precisionAtK": 0.0187,
+        "recallAtK": 0.0234,
+        "ndcgAtK": 0.0289,
+        "coverage": 0.5238,
+        "users": 929
+    },
+    {
+        "algorithm": "User-Based CF",
+        "topK": 30,
+        "precisionAtK": 0.0154,
+        "recallAtK": 0.0312,
+        "ndcgAtK": 0.0312,
+        "coverage": 0.5892,
+        "users": 929
+    },
+    {
+        "algorithm": "Item-Based CF",
+        "topK": 5,
+        "precisionAtK": 0.0102,
+        "recallAtK": 0.0071,
+        "ndcgAtK": 0.0128,
+        "coverage": 0.4891,
+        "users": 929
+    },
+    {
+        "algorithm": "Item-Based CF",
+        "topK": 10,
+        "precisionAtK": 0.0138,
+        "recallAtK": 0.0139,
+        "ndcgAtK": 0.0171,
+        "coverage": 0.5600,
+        "users": 929
+    },
+    {
+        "algorithm": "Item-Based CF",
+        "topK": 20,
+        "precisionAtK": 0.0119,
+        "recallAtK": 0.0218,
+        "ndcgAtK": 0.0223,
+        "coverage": 0.6127,
+        "users": 929
+    },
+    {
+        "algorithm": "Item-Based CF",
+        "topK": 30,
+        "precisionAtK": 0.0098,
+        "recallAtK": 0.0287,
+        "ndcgAtK": 0.0261,
+        "coverage": 0.6543,
+        "users": 929
+    },
+    {
+        "algorithm": "Hybrid",
+        "topK": 5,
+        "precisionAtK": 0.1523,
+        "recallAtK": 0.0891,
+        "ndcgAtK": 0.1987,
+        "coverage": 0.1423,
+        "users": 929
+    },
+    {
+        "algorithm": "Hybrid",
+        "topK": 10,
+        "precisionAtK": 0.1738,
+        "recallAtK": 0.1699,
+        "ndcgAtK": 0.2329,
+        "coverage": 0.1855,
+        "users": 929
+    },
+    {
+        "algorithm": "Hybrid",
+        "topK": 20,
+        "precisionAtK": 0.1389,
+        "recallAtK": 0.2438,
+        "ndcgAtK": 0.2789,
+        "coverage": 0.2431,
+        "users": 929
+    },
+    {
+        "algorithm": "Hybrid",
+        "topK": 30,
+        "precisionAtK": 0.1127,
+        "recallAtK": 0.2987,
+        "ndcgAtK": 0.3128,
+        "coverage": 0.2893,
+        "users": 929
+    }
+];
+
+    const metricSelect = document.getElementById("metric");
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+    const colors = { "User-Based CF": "#2563eb", "Item-Based CF": "#16a34a", "Hybrid": "#dc2626" };
+    const order = ["User-Based CF", "Item-Based CF", "Hybrid"];
+
+    function grouped(metric) {
+      const g = {};
+      for (const r of rows) {
+        if (!g[r.algorithm]) g[r.algorithm] = [];
+        g[r.algorithm].push({ k: Number(r.topK), v: Number(r[metric]) });
+      }
+      for (const k of Object.keys(g)) g[k].sort((a, b) => a.k - b.k);
+      return g;
+    }
+
+    function renderTable(metric) {
+      const t = document.getElementById("table");
+      const header = "<tr><th>算法</th><th>TopK</th><th>" + metric + "</th><th>评估用户数</th></tr>";
+      const body = rows
+        .map(r => "<tr><td>" + r.algorithm + "</td><td>" + r.topK + "</td><td>" + Number(r[metric]).toFixed(4) + "</td><td>" + r.users + "</td></tr>")
+        .join("");
+      t.innerHTML = header + body;
+    }
+
+    function draw(metric) {
+      const g = grouped(metric);
+      const all = rows.map(r => Number(r[metric]));
+      const minV = Math.min(...all, 0);
+      const maxV = Math.max(...all, 1);
+      const xMin = Math.min(...rows.map(r => Number(r.topK)));
+      const xMax = Math.max(...rows.map(r => Number(r.topK)));
+      const pad = 50;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const y = pad + (h * i) / 5;
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + w, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "#111827";
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, pad + h);
+      ctx.lineTo(pad + w, pad + h);
+      ctx.stroke();
+
+      function sx(x) {
+        if (xMax === xMin) return pad + w / 2;
+        return pad + ((x - xMin) / (xMax - xMin)) * w;
+      }
+      function sy(y) {
+        if (maxV === minV) return pad + h / 2;
+        return pad + h - ((y - minV) / (maxV - minV)) * h;
+      }
+
+      for (const algo of order) {
+        const points = g[algo] || [];
+        if (points.length === 0) continue;
+        ctx.strokeStyle = colors[algo];
+        ctx.fillStyle = colors[algo];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach((p, i) => {
+          const x = sx(p.k), y = sy(p.v);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        points.forEach(p => {
+          const x = sx(p.k), y = sy(p.v);
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "12px Arial";
+      ctx.fillText(metric, pad, 18);
+      ctx.fillText("TopK", canvas.width - 50, canvas.height - 12);
+      let ly = 20;
+      for (const algo of order) {
+        ctx.fillStyle = colors[algo];
+        ctx.fillRect(canvas.width - 130, ly - 10, 10, 10);
+        ctx.fillStyle = "#111827";
+        ctx.fillText(algo, canvas.width - 115, ly);
+        ly += 18;
+      }
+    }
+
+    function render() {
+      const metric = metricSelect.value;
+      draw(metric);
+      renderTable(metric);
+    }
+
+    metricSelect.addEventListener("change", render);
+    render();
+  </script>
+</body>
+</html>

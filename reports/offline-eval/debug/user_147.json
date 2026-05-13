@@ -1,0 +1,296 @@
+{
+  "user": 147,
+  "train_items": [
+    {
+      "item": 2939262,
+      "score": 4.5,
+      "ts": 1512105185
+    },
+    {
+      "item": 1567637,
+      "score": 4.5,
+      "ts": 1512180051
+    },
+    {
+      "item": 4145813,
+      "score": 4.5,
+      "ts": 1512286074
+    },
+    {
+      "item": 4145813,
+      "score": 4.5,
+      "ts": 1512286208
+    },
+    {
+      "item": 3002561,
+      "score": 4.5,
+      "ts": 1512286240
+    },
+    {
+      "item": 3002561,
+      "score": 4.5,
+      "ts": 1512286292
+    }
+  ],
+  "test_items": [
+    {
+      "item": 4145813,
+      "score": 4.5,
+      "ts": 1512286322,
+      "relevant": true
+    },
+    {
+      "item": 2693696,
+      "score": 4.5,
+      "ts": 1512286572,
+      "relevant": true
+    }
+  ],
+  "relevant_items": [
+    4145813,
+    2693696
+  ],
+  "neighbors_count": 50,
+  "top_neighbors": [
+    {
+      "neighbor": 305195,
+      "sim": 0.6486921663759762,
+      "overlap": 3,
+      "common_items": [
+        3002561,
+        1567637,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 212438,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 15206,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 241092,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 482701,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 17262,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 618820,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 837901,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 409324,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    },
+    {
+      "neighbor": 119774,
+      "sim": 0.4714045207910316,
+      "overlap": 2,
+      "common_items": [
+        3002561,
+        4145813
+      ]
+    }
+  ],
+  "recommendations": [
+    {
+      "item": 3738615,
+      "predicted_score": 4.5,
+      "simSum": 0.38490017945975047,
+      "top_contributors": [
+        [
+          256925,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 4690421,
+      "predicted_score": 4.5,
+      "simSum": 1.1547005383792515,
+      "top_contributors": [
+        [
+          579211,
+          0.0
+        ],
+        [
+          969421,
+          0.0
+        ],
+        [
+          653948,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 4181361,
+      "predicted_score": 4.5,
+      "simSum": 0.38490017945975047,
+      "top_contributors": [
+        [
+          886368,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 562852,
+      "predicted_score": 4.5,
+      "simSum": 0.38490017945975047,
+      "top_contributors": [
+        [
+          280315,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 3607361,
+      "predicted_score": 4.5,
+      "simSum": 0.7698003589195009,
+      "top_contributors": [
+        [
+          381764,
+          0.0
+        ],
+        [
+          326312,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 2520377,
+      "predicted_score": 4.5,
+      "simSum": 0.7698003589195009,
+      "top_contributors": [
+        [
+          871336,
+          0.0
+        ],
+        [
+          177288,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 2355072,
+      "predicted_score": 4.5,
+      "simSum": 0.38490017945975047,
+      "top_contributors": [
+        [
+          484160,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 2858794,
+      "predicted_score": 4.5,
+      "simSum": 0.38490017945975047,
+      "top_contributors": [
+        [
+          376375,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 982926,
+      "predicted_score": 4.457817925593808,
+      "simSum": 1.5459751784155544,
+      "top_contributors": [
+        [
+          890902,
+          -0.065212
+        ],
+        [
+          326784,
+          0.0
+        ],
+        [
+          218428,
+          0.0
+        ],
+        [
+          11557,
+          0.0
+        ]
+      ]
+    },
+    {
+      "item": 2735466,
+      "predicted_score": 4.44383442924471,
+      "simSum": 1.161074998955804,
+      "top_contributors": [
+        [
+          758214,
+          -0.065212
+        ],
+        [
+          313596,
+          0.0
+        ],
+        [
+          516687,
+          0.0
+        ]
+      ]
+    }
+  ],
+  "popular_fallback_used": false
+}
