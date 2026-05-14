@@ -71,7 +71,6 @@ com\example\recommend\service\FileStorageService$StoredFile.class
 com\example\recommend\web\AdminCrudController$UserUpsertRequest.class
 com\example\recommend\web\RecommendationController.class
 com\example\recommend\web\AdminCrudController$UserDto.class
-com\example\recommend\algo\ItemBasedCF$ItemSim.class
 com\example\recommend\web\SpaRouteController.class
 com\example\recommend\web\WebResourceConfig.class
 com\example\recommend\service\OfflineEvaluationService.class

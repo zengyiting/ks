@@ -10,7 +10,7 @@ public final class SimilarityMetrics {
     private SimilarityMetrics() {}
 
     private static final double GLOBAL_MEAN = 3.5;
-    private static final int MIN_OVERLAP = 2;
+    private static final int MIN_OVERLAP = 3;
 
     public static int overlapCount(Map<Long, Double> a, Map<Long, Double> b) {
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) return 0;
@@ -62,19 +62,21 @@ public final class SimilarityMetrics {
         if (den <= 1e-12) return 0.0;
 
         double sim = num / den;
-        // 温和shrinkage：sim * overlap / (overlap + 3)
-        return sim * overlap / (overlap + 3.0);
+        if (den <= 1e-12) return 0.0;
+
+        // 温和shrinkage：sim * overlap / (overlap + 5)
+        return sim * overlap / (overlap + 5.0);
     }
 
     /**
      * ItemCF专用的Adjusted Cosine相似度
      * 减去用户平均分：(r_ui - mean_u)
      * 适用于物品-物品相似度计算
-     * 使用shrinkage：sim * overlap / (overlap + 10)
+     * 使用shrinkage：sim * overlap / (overlap + 8)
      */
     public static double itemSimilarity(Map<Long, Double> a, Map<Long, Double> b) {
         int overlap = overlapCount(a, b);
-        if (overlap < 4) return 0.0;
+        if (overlap < 3) return 0.0;
 
         double dot = 0.0;
         double normA = 0.0;
@@ -96,10 +98,10 @@ public final class SimilarityMetrics {
             }
         }
 
-        if (n < 4 || normA == 0 || normB == 0) return 0.0;
+        if (n < 3 || normA == 0 || normB == 0) return 0.0;
 
         double sim = dot / (Math.sqrt(normA) * Math.sqrt(normB));
-        return sim * overlap / (overlap + 10.0);
+        return sim * overlap / (overlap + 8.0);
     }
 
     /**

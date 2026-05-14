@@ -16,7 +16,7 @@ public class AlgorithmEvaluator {
 
     private static final int TOP_N = 10;
     private static final double TEST_RATIO = 0.2;
-    private static final double RELEVANCE_THRESHOLD = 4.0;
+    private static final double RELEVANCE_THRESHOLD = 3.0;
     private static final int RANDOM_SEED = 42;
 
     /**
