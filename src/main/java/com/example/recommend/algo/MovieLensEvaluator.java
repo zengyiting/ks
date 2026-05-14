@@ -11,11 +11,13 @@ public class MovieLensEvaluator {
 
     public static void main(String[] args) throws IOException {
         String dataPath = "docs/ml-100k/u.data";
+        double sampleRatio = 1.0;
 
         System.out.println("=== MovieLens Evaluator ===");
         System.out.println("Loading data from: " + dataPath);
+        System.out.println("Sample ratio: " + (sampleRatio * 100) + "% (1/20 of data)");
 
-        Map<Long, Map<Long, Double>> matrix = loadRatings(dataPath);
+        Map<Long, Map<Long, Double>> matrix = loadRatings(dataPath, sampleRatio);
         Map<Long, String> categoryMap = new HashMap<>();
 
         System.out.println("Loaded: " + matrix.size() + " users");
@@ -114,10 +116,14 @@ public class MovieLensEvaluator {
         };
     }
 
-    private static Map<Long, Map<Long, Double>> loadRatings(String path) throws IOException {
+    private static Map<Long, Map<Long, Double>> loadRatings(String path, double sampleRatio) throws IOException {
         Map<Long, Map<Long, Double>> matrix = new HashMap<>();
+        Random random = new Random(42);
         Files.lines(Paths.get(path))
                 .forEach(line -> {
+                    if (random.nextDouble() >= sampleRatio) {
+                        return;
+                    }
                     String[] parts = line.split("\t");
                     long userId = Long.parseLong(parts[0]);
                     long itemId = Long.parseLong(parts[1]);
