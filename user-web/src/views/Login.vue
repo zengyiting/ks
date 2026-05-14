@@ -35,10 +35,10 @@ const submitLogin = async () => {
     status.value = '请填写完整的登录信息';
     return;
   }
-  
+
   loading.value = true;
   status.value = '';
-  
+
   try {
     let result;
     if (loginType.value === 'phone') {
@@ -48,10 +48,14 @@ const submitLogin = async () => {
     } else {
       result = await loginWithUsername(username.value, password.value);
     }
-    
+
     status.value = result.created ? '已为你自动注册并登录' : '登录成功';
     setTimeout(() => {
-      router.push(redirectTo.value);
+      if (redirectTo.value === '/') {
+        window.location.href = '/';
+      } else {
+        router.push(redirectTo.value);
+      }
     }, 500);
   } catch (err) {
     status.value = err.message || '登录失败';
@@ -76,10 +80,10 @@ const goToRegister = () => {
       <!-- 流星 -->
       <div class="shooting-star" v-for="i in 6" :key="i" :style="{ '--delay': `${i * 2.5}s`, '--top': `${15 + i * 12}%` }"></div>
       <!-- 浮动光点 -->
-      <div class="float-light" v-for="i in 20" :key="'light-' + i" :style="{ 
-        '--delay': `${i * 0.3}s`, 
-        '--left': `${Math.random() * 100}%`, 
-        '--top': `${Math.random() * 100}%` 
+      <div class="float-light" v-for="i in 20" :key="'light-' + i" :style="{
+        '--delay': `${i * 0.3}s`,
+        '--left': `${Math.random() * 100}%`,
+        '--top': `${Math.random() * 100}%`
       }"></div>
       <!-- 光晕 -->
       <div class="glow-circle glow-1"></div>
@@ -111,24 +115,24 @@ const goToRegister = () => {
 
         <!-- 登录类型切换 -->
         <div class="login-tabs">
-          <button 
-            class="tab-btn" 
+          <button
+            class="tab-btn"
             :class="{ active: loginType === 'phone' }"
             @click="loginType = 'phone'"
           >
             <span class="tab-icon">📱</span>
             手机
           </button>
-          <button 
-            class="tab-btn" 
+          <button
+            class="tab-btn"
             :class="{ active: loginType === 'email' }"
             @click="loginType = 'email'"
           >
             <span class="tab-icon">📧</span>
             邮箱
           </button>
-          <button 
-            class="tab-btn" 
+          <button
+            class="tab-btn"
             :class="{ active: loginType === 'username' }"
             @click="loginType = 'username'"
           >
@@ -565,11 +569,11 @@ const goToRegister = () => {
   .login-container {
     grid-template-columns: 1fr;
   }
-  
+
   .login-hero {
     display: none;
   }
-  
+
   .login-panel {
     padding: 24px;
   }
