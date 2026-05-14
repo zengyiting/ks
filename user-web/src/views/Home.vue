@@ -44,6 +44,19 @@ const greeting = computed(() => {
   return `${name}，欢迎回来`;
 });
 
+const heroTip = computed(() => {
+  if (!isLoggedIn.value) {
+    return {
+      title: '轻选提示',
+      content: '登录后开启个性化推荐与评分，让算法更贴合你的节奏。'
+    };
+  }
+  return {
+    title: '推荐已开启',
+    content: '你的个性化推荐已激活，系统将根据你的偏好持续优化推荐结果。'
+  };
+});
+
 const recommendationTotal = computed(() => Math.min(recommendations.value.length, RECOMMEND_MAX_ITEMS));
 const exploreTotal = computed(() => Math.min(exploreItems.value.length, EXPLORE_MAX_ITEMS));
 
@@ -262,8 +275,8 @@ onMounted(async () => {
         <p>简约、干净、轻松的选品体验。浏览无需登录，收藏与加购将沉淀你的偏好。</p>
       </div>
       <div class="hero-card">
-        <h3>轻选提示</h3>
-        <p>登录后开启个性化推荐与评分，让算法更贴合你的节奏。</p>
+        <h3>{{ heroTip.title }}</h3>
+        <p>{{ heroTip.content }}</p>
         <div class="status-line" v-if="status">{{ status }}</div>
       </div>
     </section>
