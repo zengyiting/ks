@@ -286,7 +286,7 @@ onMounted(async () => {
         <section class="feed-block">
           <div class="section-header">
             <div>
-              <h3 class="section-title">为你推荐</h3>
+              <h3 class="section-title">轻选集推荐</h3>
               <div class="section-subtitle">Strong Relevance · 协同过滤优先高相似结果</div>
             </div>
             <div class="selector">
