@@ -50,12 +50,9 @@ const submitLogin = async () => {
     }
 
     status.value = result.created ? '已为你自动注册并登录' : '登录成功';
+    console.debug('[Login] Login successful, redirecting to:', redirectTo.value);
     setTimeout(() => {
-      if (redirectTo.value === '/') {
-        window.location.href = '/';
-      } else {
-        router.push(redirectTo.value);
-      }
+      router.push(redirectTo.value);
     }, 500);
   } catch (err) {
     status.value = err.message || '登录失败';

@@ -26,29 +26,20 @@ const readStoredUser = () => {
   return null;
 };
 
-console.debug('[useUser] Module loaded, initial user:', readStoredUser());
 const user = ref(readStoredUser());
-console.debug('[useUser] user ref initialized:', user.value);
 
 const userId = computed(() => {
   if (!user.value) return null;
   const id = user.value.id || user.value.userId;
-  const result = Number.isFinite(id) ? id : null;
-  console.debug('[useUser] userId computed:', result);
-  return result;
+  return Number.isFinite(id) ? id : null;
 });
 
 const isLoggedIn = computed(() => {
   const id = userId.value;
-  const result = Number.isFinite(id) && id > 0;
-  console.debug('[useUser] isLoggedIn computed:', result, 'userId:', id);
-  return result;
+  return Number.isFinite(id) && id > 0;
 });
 
-const currentUser = computed(() => {
-  console.debug('[useUser] currentUser computed:', user.value);
-  return user.value;
-});
+const currentUser = computed(() => user.value);
 
 const saveUser = (payload) => {
   console.debug('[useUser] Saving user:', payload);
@@ -60,38 +51,33 @@ const saveUser = (payload) => {
   };
   user.value = userData;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+  console.debug('[useUser] User saved, isLoggedIn:', isLoggedIn.value, 'userId:', userId.value);
 };
 
 const loginWithPhone = async (phone, password) => {
   const data = await apiPost('/api/auth/login', { phone, password });
-  console.debug('[useUser] Login response:', data);
   if (!data || !data.userId) {
     throw new Error('登录失败：未返回用户信息');
   }
   saveUser({ id: data.userId, username: data.username, phone: data.phone, email: data.email });
-  console.debug('[useUser] After login - isLoggedIn:', isLoggedIn.value, 'userId:', userId.value);
   return data;
 };
 
 const loginWithEmail = async (email, password) => {
   const data = await apiPost('/api/auth/login-email', { email, password });
-  console.debug('[useUser] Login response:', data);
   if (!data || !data.userId) {
     throw new Error('登录失败：未返回用户信息');
   }
   saveUser({ id: data.userId, username: data.username, phone: data.phone, email: data.email });
-  console.debug('[useUser] After login - isLoggedIn:', isLoggedIn.value, 'userId:', userId.value);
   return data;
 };
 
 const loginWithUsername = async (username, password) => {
   const data = await apiPost('/api/auth/login-username', { username, password });
-  console.debug('[useUser] Login response:', data);
   if (!data || !data.userId) {
     throw new Error('登录失败：未返回用户信息');
   }
   saveUser({ id: data.userId, username: data.username, phone: data.phone, email: data.email });
-  console.debug('[useUser] After login - isLoggedIn:', isLoggedIn.value, 'userId:', userId.value);
   return data;
 };
 

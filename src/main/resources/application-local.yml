@@ -21,7 +21,7 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:192.168.253.159}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASS:}
       database: ${REDIS_DB:0}
@@ -34,6 +34,10 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1ms
+        shutdown-timeout: 100ms
+      connect-timeout: 2000ms
+      client-type: lettuce
+    redis.repositories.enabled: false
 
   servlet:
     multipart:

@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ItemCard from '../components/ItemCard.vue';
@@ -7,6 +7,8 @@ import { useUser } from '../composables/useUser.js';
 
 const router = useRouter();
 const { userId, isLoggedIn, currentUser } = useUser();
+
+console.debug('[Home] Component mounted, isLoggedIn:', isLoggedIn.value, 'userId:', userId.value);
 
 const RECOMMEND_INITIAL_BATCH = 20;
 const RECOMMEND_LOAD_BATCH = 30;
