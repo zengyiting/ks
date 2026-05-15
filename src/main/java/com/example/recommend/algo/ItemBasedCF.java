@@ -51,6 +51,44 @@ public class ItemBasedCF implements RecommenderStrategy {
                 .collect(Collectors.toList());
     }
 
+    public List<Recommendation> recommend(Map<Long, Map<Long, Double>> userItem, Map<Long, Map<Long, Double>> itemUsers, Long userId, int topN) {
+        if (userItem == null || userItem.isEmpty() || userId == null || topN <= 0) {
+            return List.of();
+        }
+
+        Map<Long, Double> targetRatings = userItem.getOrDefault(userId, Collections.emptyMap());
+        if (targetRatings.isEmpty()) {
+            return fallbackToPopularity(userItem, topN);
+        }
+
+        if (itemUsers == null || itemUsers.isEmpty()) {
+            itemUsers = buildItemUsers(userItem);
+        }
+        if (itemUsers.isEmpty()) {
+            return fallbackToPopularity(userItem, topN);
+        }
+
+        int currentUserCount = userItem.size();
+        int currentItemCount = itemUsers.size();
+        if (!cacheBuilt || lastUserCount != currentUserCount || lastItemCount != currentItemCount) {
+            buildSimilarityCache(itemUsers);
+            lastUserCount = currentUserCount;
+            lastItemCount = currentItemCount;
+        }
+
+        Map<Long, Double> predictions = predictRatings(targetRatings, itemUsers);
+
+        if (predictions.isEmpty()) {
+            return fallbackToPopularity(userItem, topN);
+        }
+
+        return predictions.entrySet().stream()
+                .map(e -> new Recommendation(e.getKey(), e.getValue()))
+                .sorted()
+                .limit(topN)
+                .collect(Collectors.toList());
+    }
+
     private void buildSimilarityCache(Map<Long, Map<Long, Double>> itemUsers) {
         similarityCache = new HashMap<>();
         List<Long> items = new ArrayList<>(itemUsers.keySet());
@@ -105,7 +143,7 @@ public class ItemBasedCF implements RecommenderStrategy {
 
         double numerator = sumXY - sumX * sumY / n;
         double sim = numerator / denominator;
-        
+
         return sim * n / (n + 5);
     }
 
