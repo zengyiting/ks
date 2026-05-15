@@ -1000,6 +1000,165 @@ public class RecommendationService {
     }
 
     /**
+     * 获取热门商品推荐列表
+     *
+     * <p>基于全站评分数量和评分均值计算热门商品，考虑时间衰减。
+     *
+     * @param topN 需要的推荐数量
+     * @return 热门商品推荐列表
+     */
+    @Transactional(readOnly = true)
+    public List<Recommendation> getPopularItems(int topN) {
+        if (topN <= 0) {
+            return List.of();
+        }
+        RecommendationContext context = new RecommendationContext();
+        return popularFallback(context, topN, new HashSet<>());
+    }
+
+    /**
+     * 获取指定分类的热门商品推荐列表
+     *
+     * @param category 分类名称
+     * @param topN 需要的推荐数量
+     * @return 指定分类的热门商品推荐列表
+     */
+    @Transactional(readOnly = true)
+    public List<Recommendation> getPopularItemsByCategory(String category, int topN) {
+        if (topN <= 0 || category == null || category.trim().isBlank()) {
+            return List.of();
+        }
+        RecommendationContext context = new RecommendationContext();
+        List<Recommendation> popular = popularFallback(context, topN * 2, new HashSet<>());
+        
+        Map<Long, String> categoryMap = context.loadCategoryMap(
+            popular.stream()
+                .map(Recommendation::getItemId)
+                .collect(java.util.stream.Collectors.toSet())
+        );
+        
+        return popular.stream()
+                .filter(rec -> category.equals(categoryMap.get(rec.getItemId())))
+                .limit(topN)
+                .toList();
+    }
+
+    /**
+     * 获取多样性优化的推荐列表
+     *
+     * <p>使用MMR算法平衡相关性与多样性，返回多样化的推荐结果。
+     *
+     * @param userId 用户ID
+     * @param topN 需要的推荐数量
+     * @param type 算法类型
+     * @param diversityLevel 多样性级别（0.0-1.0，越高越多样）
+     * @return 多样性优化后的推荐列表
+     */
+    @Transactional(readOnly = true)
+    public List<RecommendationResult> recommendWithDiversity(Long userId, int topN, AlgorithmType type, double diversityLevel) {
+        if (userId == null || topN <= 0) {
+            return List.of();
+        }
+        
+        RecommendationContext context = new RecommendationContext();
+        AlgorithmType safeType = type == null ? AlgorithmType.USER_BASED : type;
+        
+        // 获取初始推荐列表（取更多候选）
+        int poolSize = Math.max(topN * 3, 50);
+        List<Recommendation> initialRecs = recommendForUser(context, userId, poolSize, safeType);
+        
+        if (initialRecs.isEmpty()) {
+            return List.of();
+        }
+        
+        // 应用多样性优化
+        Set<Long> itemIds = initialRecs.stream()
+                .map(Recommendation::getItemId)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, String> categoryMap = context.loadCategoryMap(itemIds);
+        
+        // 根据多样性级别调整lambda参数
+        double lambda = 1.0 - diversityLevel * 0.4; // lambda: 0.6-1.0
+        List<Recommendation> diversified = diversifyRecommendationsWithLambda(initialRecs, topN, categoryMap, lambda);
+        
+        // 生成推荐理由
+        Map<Long, Map<Long, Double>> matrix = context.userItemMatrix();
+        Map<Long, Double> userRatings = matrix.getOrDefault(userId, Collections.emptyMap());
+        Map<String, Double> pref = categoryPreferenceMap(userRatings, Collections.emptyMap(), categoryMap);
+        String topCategory = pref.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+        
+        return diversified.stream()
+                .map(rec -> {
+                    String reason = buildReason(safeType, rec.getItemId(), rec.getScore(), categoryMap, topCategory, 0.0, userRatings.keySet());
+                    return new RecommendationResult(rec.getItemId(), rec.getScore(), reason);
+                })
+                .toList();
+    }
+
+    /**
+     * 使用指定lambda参数的MMR多样化算法
+     */
+    private List<Recommendation> diversifyRecommendationsWithLambda(
+            List<Recommendation> ranked,
+            int topN,
+            Map<Long, String> categoryMap,
+            double lambda
+    ) {
+        if (ranked.isEmpty()) {
+            return ranked;
+        }
+
+        List<Recommendation> pool = new ArrayList<>(ranked);
+        List<Recommendation> selected = new ArrayList<>();
+
+        // 选择得分最高的第一个
+        if (!pool.isEmpty()) {
+            Recommendation first = pool.stream()
+                    .max(Comparator.comparingDouble(Recommendation::getScore))
+                    .orElse(null);
+            if (first != null) {
+                selected.add(first);
+                pool.remove(first);
+            }
+        }
+
+        while (!pool.isEmpty() && selected.size() < topN) {
+            Recommendation best = null;
+            double bestMmr = Double.NEGATIVE_INFINITY;
+
+            for (Recommendation candidate : pool) {
+                double relevance = candidate.getScore();
+
+                double maxSimilarity = 0.0;
+                String candidateCategory = categoryMap.getOrDefault(candidate.getItemId(), "");
+
+                for (Recommendation selectedRec : selected) {
+                    String selectedCategory = categoryMap.getOrDefault(selectedRec.getItemId(), "");
+                    double similarity = candidateCategory.equals(selectedCategory) ? 0.8 : 0.1;
+                    maxSimilarity = Math.max(maxSimilarity, similarity);
+                }
+
+                double positionWeight = 1.0 - 0.1 * Math.min(selected.size(), 5);
+                double mmr = lambda * relevance * positionWeight - (1.0 - lambda) * maxSimilarity;
+
+                if (mmr > bestMmr) {
+                    bestMmr = mmr;
+                    best = candidate;
+                }
+            }
+
+            if (best == null) {
+                break;
+            }
+
+            selected.add(best);
+            pool.remove(best);
+        }
+
+        return selected;
+    }
+
+    /**
      * 构建推荐理由
      *
      * <p>根据算法类型、类别匹配情况和得分生成人性化的推荐理由。

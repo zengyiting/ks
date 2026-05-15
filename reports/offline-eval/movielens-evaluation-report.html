@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>推荐系统算法评估报告</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 40px 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 40px; }
+        .header h1 { font-size: 36px; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .card { background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); padding: 30px; margin-bottom: 30px; }
+        .card-title { font-size: 24px; color: #333; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 14px; text-align: center; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; color: #333; }
+        tr:hover { background: #f8f9fa; }
+        .highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .chart-container { height: 400px; margin: 20px 0; }
+        .bar-chart { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; padding: 20px; }
+        .bar-group { display: flex; gap: 8px; align-items: flex-end; }
+        .bar { width: 35px; border-radius: 6px 6px 0 0; transition: height 0.5s ease; position: relative; }
+        .bar.precision { background: #667eea; }
+        .bar.recall { background: #f093fb; }
+        .bar.ndcg { background: #4facfe; }
+        .bar.coverage { background: #43e97b; }
+        .bar-label { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; white-space: nowrap; color: #333; }
+        .algo-label { text-align: center; margin-top: 10px; font-size: 13px; color: #666; font-weight: 500; }
+        .legend { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .legend-color { width: 20px; height: 20px; border-radius: 4px; }
+        .footer { text-align: center; color: white; margin-top: 40px; opacity: 0.8; font-size: 14px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; color: white; text-align: center; }
+        .metric-value { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .metric-label { font-size: 14px; opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 推荐系统算法评估报告</h1>
+            <p>基于MovieLens 100K数据集</p>
+        </div>
+<div class="card"><h2 class="card-title">📈 评估结果对比</h2><div class="table-container"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody><tr><td><strong>User-Based CF</strong></td><td>0.0101</td><td>0.0181</td><td>0.0166</td><td>0.4036</td><td>782</td><td>813</td></tr><tr><td><strong>Item-Based CF</strong></td><td>0.0055</td><td>0.0135</td><td>0.0091</td><td>0.4797</td><td>782</td><td>20382</td></tr><tr class="highlight"><td><strong>Behavior-Based</strong></td><td>0.0294</td><td>0.0811</td><td>0.0571</td><td>0.1354</td><td>782</td><td>20717</td></tr><tr><td><strong>Hybrid</strong></td><td>0.0283</td><td>0.0789</td><td>0.0532</td><td>0.2208</td><td>782</td><td>37819</td></tr></tbody></table></div></div><div class="card"><h2 class="card-title">📊 可视化对比</h2><div class="chart-container"><div class="bar-chart"><div style="display: flex; flex-direction: column; align-items: center; flex: 1;"><div class="bar-group"><div class="bar precision" style="height: 103.0px" title="精确率: 0.0101"><span class="bar-label">0.010</span></div><div class="bar recall" style="height: 66.8px" title="召回率: 0.0181"><span class="bar-label">0.018</span></div><div class="bar ndcg" style="height: 87.4px" title="NDCG: 0.0166"><span class="bar-label">0.017</span></div><div class="bar coverage" style="height: 252.4px" title="覆盖率: 0.4036"><span class="bar-label">0.404</span></div></div><div class="algo-label">User-Based CF</div></div><div style="display: flex; flex-direction: column; align-items: center; flex: 1;"><div class="bar-group"><div class="bar precision" style="height: 56.1px" title="精确率: 0.0055"><span class="bar-label">0.005</span></div><div class="bar recall" style="height: 49.9px" title="召回率: 0.0135"><span class="bar-label">0.013</span></div><div class="bar ndcg" style="height: 47.7px" title="NDCG: 0.0091"><span class="bar-label">0.009</span></div><div class="bar coverage" style="height: 300.0px" title="覆盖率: 0.4797"><span class="bar-label">0.480</span></div></div><div class="algo-label">Item-Based CF</div></div><div style="display: flex; flex-direction: column; align-items: center; flex: 1;"><div class="bar-group"><div class="bar precision" style="height: 300.0px" title="精确率: 0.0294"><span class="bar-label">0.029</span></div><div class="bar recall" style="height: 300.0px" title="召回率: 0.0811"><span class="bar-label">0.081</span></div><div class="bar ndcg" style="height: 300.0px" title="NDCG: 0.0571"><span class="bar-label">0.057</span></div><div class="bar coverage" style="height: 84.7px" title="覆盖率: 0.1354"><span class="bar-label">0.135</span></div></div><div class="algo-label">Behavior-Based</div></div><div style="display: flex; flex-direction: column; align-items: center; flex: 1;"><div class="bar-group"><div class="bar precision" style="height: 288.3px" title="精确率: 0.0283"><span class="bar-label">0.028</span></div><div class="bar recall" style="height: 291.9px" title="召回率: 0.0789"><span class="bar-label">0.079</span></div><div class="bar ndcg" style="height: 279.3px" title="NDCG: 0.0532"><span class="bar-label">0.053</span></div><div class="bar coverage" style="height: 138.1px" title="覆盖率: 0.2208"><span class="bar-label">0.221</span></div></div><div class="algo-label">Hybrid</div></div></div></div><div class="legend"><div class="legend-item"><div class="legend-color" style="background: #667eea;"></div><span>精确率</span></div><div class="legend-item"><div class="legend-color" style="background: #f093fb;"></div><span>召回率</span></div><div class="legend-item"><div class="legend-color" style="background: #4facfe;"></div><span>NDCG</span></div><div class="legend-item"><div class="legend-color" style="background: #43e97b;"></div><span>覆盖率</span></div></div></div><div class="footer">
+    <p>📅 生成时间：2026-05-15T13:27:30.212660200         | 📁 项目：基于协同过滤的推荐系统</p>
+    </div>
+</div>
+</body>
+</html>

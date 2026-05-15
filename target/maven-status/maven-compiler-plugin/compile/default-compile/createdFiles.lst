@@ -1,6 +1,7 @@
 com\example\recommend\service\OfflineEvaluationService$HybridWeights.class
 com\example\recommend\service\RecommendationService$RecommendationResult.class
 com\example\recommend\web\CatalogController$ItemDetailDto.class
+com\example\recommend\web\AdminCrudController$CategoryStatsDto.class
 com\example\recommend\service\AdminCrudService.class
 com\example\recommend\web\AuthController$EmailPasswordRequest.class
 com\example\recommend\repository\RatingRepository$UserRatingWithItemView.class
@@ -11,8 +12,10 @@ com\example\recommend\web\AuthController$RefreshTokenRequest.class
 com\example\recommend\config\InMemoryCacheServiceImpl$CacheEntry.class
 com\example\recommend\repository\ItemRepository.class
 com\example\recommend\web\BehaviorController.class
+com\example\recommend\web\AuthController$UserUpdateRequest.class
 com\example\recommend\algo\MovieLensEvaluator$1.class
 com\example\recommend\algo\RecommenderStrategy.class
+com\example\recommend\web\AuthController$ResetPasswordRequest.class
 com\example\recommend\config\CacheConfig.class
 com\example\recommend\web\AuthController$UserInfoResponse.class
 com\example\recommend\web\CatalogController$UserItemFlagDto.class
@@ -27,6 +30,7 @@ com\example\recommend\service\AlgorithmType.class
 com\example\recommend\service\OfflineEvaluationService$AlgorithmMetrics.class
 com\example\recommend\web\BehaviorController$ItemDto.class
 com\example\recommend\service\EmailService.class
+com\example\recommend\web\AuthController$ChangePasswordRequest.class
 com\example\recommend\repository\RatingRepository$UserItemRatedAtView.class
 com\example\recommend\web\AdminCrudController$ItemDto.class
 com\example\recommend\service\OfflineEvaluationService$EvaluationReport.class
@@ -38,6 +42,7 @@ com\example\recommend\service\BehaviorService.class
 com\example\recommend\service\RecommendationService$1.class
 com\example\recommend\algo\Recommendation.class
 com\example\recommend\repository\UserItemFlagRepository.class
+com\example\recommend\service\AdminCrudService$CategoryStats.class
 com\example\recommend\web\AuthController$PhoneRegisterRequest.class
 com\example\recommend\web\AdminCrudController$ItemUpsertRequest.class
 com\example\recommend\algo\AlgorithmEvaluator$EvaluationResult.class
@@ -54,6 +59,7 @@ com\example\recommend\service\RecommendationService$RecommendationContext.class
 com\example\recommend\service\BehaviorService$UpsertRatingCommand.class
 com\example\recommend\repository\RatingRepository$UserItemScoreRatedAtView.class
 com\example\recommend\model\Rating.class
+com\example\recommend\web\AdminCrudController$CategoryUpdateRequest.class
 com\example\recommend\web\AuthController.class
 com\example\recommend\algo\AlgorithmEvaluator.class
 com\example\recommend\web\BehaviorController$UpsertRatingRequest.class

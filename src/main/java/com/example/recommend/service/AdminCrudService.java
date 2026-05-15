@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 管理员CRUD服务类
@@ -292,6 +293,88 @@ public class AdminCrudService {
         itemAssociationPrecomputeService.markDirty();
         recommendationCacheService.invalidateAll();
     }
+
+    /**
+     * 根据ID查询商品详情
+     *
+     * @param id 商品ID
+     * @return 商品对象，如果不存在返回空Optional
+     */
+    @Transactional(readOnly = true)
+    public Optional<Item> getItemById(Long id) {
+        if (id == null || id <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "商品ID非法");
+        }
+        return itemRepository.findById(id);
+    }
+
+    /**
+     * 根据分类查询商品列表
+     *
+     * @param category 分类名称
+     * @return 该分类下的商品列表
+     */
+    @Transactional(readOnly = true)
+    public List<Item> listItemsByCategory(String category) {
+        if (category == null || category.trim().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "分类名称不能为空");
+        }
+        return itemRepository.findByCategory(category.trim());
+    }
+
+    /**
+     * 获取所有商品分类
+     *
+     * @return 分类名称列表
+     */
+    @Transactional(readOnly = true)
+    public List<String> listAllCategories() {
+        return itemRepository.findAllCategories();
+    }
+
+    /**
+     * 批量更新商品分类
+     *
+     * @param oldCategory 原分类名称
+     * @param newCategory 新分类名称
+     * @return 更新的商品数量
+     */
+    @Transactional
+    public int updateItemsCategory(String oldCategory, String newCategory) {
+        if (oldCategory == null || oldCategory.trim().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "原分类名称不能为空");
+        }
+        if (newCategory == null || newCategory.trim().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新分类名称不能为空");
+        }
+        List<Item> items = itemRepository.findByCategory(oldCategory.trim());
+        for (Item item : items) {
+            item.setCategory(newCategory.trim());
+            itemRepository.save(item);
+        }
+        int count = items.size();
+        itemAssociationPrecomputeService.markDirty();
+        recommendationCacheService.invalidateAll();
+        return count;
+    }
+
+    /**
+     * 获取分类统计信息
+     *
+     * @return 分类名称和对应的商品数量列表
+     */
+    @Transactional(readOnly = true)
+    public List<CategoryStats> listCategoryStats() {
+        List<String> categories = itemRepository.findAllCategories();
+        return categories.stream()
+                .map(category -> new CategoryStats(category, itemRepository.countByCategory(category)))
+                .toList();
+    }
+
+    /**
+     * 分类统计信息记录
+     */
+    public record CategoryStats(String category, long count) {}
 
     /**
      * 规范化字符串（非空验证）

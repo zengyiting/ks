@@ -423,6 +423,126 @@ public class AuthService {
         }
     }
 
+    /**
+     * 修改密码（需要旧密码）
+     */
+    @Transactional
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+
+        if (user.isDisabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "用户已禁用");
+        }
+
+        String safeOldPassword = normalizePassword(oldPassword);
+        String safeNewPassword = normalizePassword(newPassword);
+
+        String stored = user.getPasswordHash();
+        if (stored == null || stored.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前账号未设置密码，请先设置密码");
+        }
+
+        if (!stored.equals(hashPassword(safeOldPassword))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "旧密码错误");
+        }
+
+        user.setPasswordHash(hashPassword(safeNewPassword));
+        userRepository.save(user);
+    }
+
+    /**
+     * 通过验证码重置密码
+     */
+    @Transactional
+    public void resetPasswordBySms(String phone, String code, String newPassword) {
+        String safePhone = normalizePhone(phone);
+        String safeNewPassword = normalizePassword(newPassword);
+
+        String key = SMS_CODE_PREFIX + safePhone;
+        String storedCode = cacheService.get(key);
+        if (storedCode == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码已过期，请重新获取");
+        }
+        if (!storedCode.equals(code)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "验证码错误");
+        }
+
+        cacheService.delete(key);
+
+        User user = userRepository.findByPhone(safePhone)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "该手机号未注册"));
+
+        if (user.isDisabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "用户已禁用");
+        }
+
+        user.setPasswordHash(hashPassword(safeNewPassword));
+        userRepository.save(user);
+    }
+
+    /**
+     * 更新用户信息
+     */
+    @Transactional
+    public User updateUserInfo(Long userId, String username, String phone, String email) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+
+        if (user.isDisabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "用户已禁用");
+        }
+
+        // 更新用户名（如果提供）
+        if (username != null && !username.trim().isBlank()) {
+            String safeUsername = username.trim();
+            if (safeUsername.length() < 3) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户名至少3个字符");
+            }
+            // 检查用户名是否被其他用户使用
+            userRepository.findByUsername(safeUsername).ifPresent(existing -> {
+                if (!existing.getId().equals(userId)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "该用户名已被使用");
+                }
+            });
+            user.setUsername(safeUsername);
+        }
+
+        // 更新手机号（如果提供）
+        if (phone != null && !phone.trim().isBlank()) {
+            String safePhone = normalizePhone(phone);
+            // 检查手机号是否被其他用户使用
+            userRepository.findByPhone(safePhone).ifPresent(existing -> {
+                if (!existing.getId().equals(userId)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "该手机号已被注册");
+                }
+            });
+            user.setPhone(safePhone);
+        }
+
+        // 更新邮箱（如果提供）
+        if (email != null && !email.trim().isBlank()) {
+            String safeEmail = normalizeEmail(email);
+            // 检查邮箱是否被其他用户使用
+            userRepository.findByEmail(safeEmail).ifPresent(existing -> {
+                if (!existing.getId().equals(userId)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "该邮箱已被注册");
+                }
+            });
+            user.setEmail(safeEmail);
+        }
+
+        return userRepository.save(user);
+    }
+
+    /**
+     * 获取用户详情
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> getUserById(Long userId) {
+        return userRepository.findById(userId);
+    }
+
     public record TokenResponse(
             String accessToken,
             String refreshToken,

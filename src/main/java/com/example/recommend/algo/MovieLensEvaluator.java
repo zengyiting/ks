@@ -11,11 +11,11 @@ public class MovieLensEvaluator {
 
     public static void main(String[] args) throws IOException {
         String dataPath = "docs/ml-100k/u.data";
-        double sampleRatio = 1.0;
+        double sampleRatio = 0.3;
 
         System.out.println("=== MovieLens Evaluator ===");
         System.out.println("Loading data from: " + dataPath);
-        System.out.println("Sample ratio: " + (sampleRatio * 100) + "% (1/20 of data)");
+        System.out.println("Sample ratio: " + (sampleRatio * 100) + "%");
 
         Map<Long, Map<Long, Double>> matrix = loadRatings(dataPath, sampleRatio);
         Map<Long, String> categoryMap = new HashMap<>();
@@ -32,12 +32,17 @@ public class MovieLensEvaluator {
         UserBasedCF userBasedCF = new UserBasedCF();
         ItemBasedCF itemBasedCF = new ItemBasedCF();
 
-        evaluateAlgorithm("User-Based CF", AlgorithmType.USER_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF);
-        evaluateAlgorithm("Item-Based CF", AlgorithmType.ITEM_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF);
-        evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, categoryMap, 10, userBasedCF, itemBasedCF);
+        List<EvaluationResult> results = new ArrayList<>();
+        results.add(evaluateAlgorithm("User-Based CF", AlgorithmType.USER_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
+        results.add(evaluateAlgorithm("Item-Based CF", AlgorithmType.ITEM_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
+        results.add(evaluateAlgorithm("Behavior-Based", AlgorithmType.BEHAVIOR_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
+        results.add(evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, categoryMap, 10, userBasedCF, itemBasedCF));
+
+        generateHtmlReport(results, "reports/offline-eval/movielens-evaluation-report.html");
+        System.out.println("\nReport saved to: reports/offline-eval/movielens-evaluation-report.html");
     }
 
-    private static void evaluateAlgorithm(
+    private static EvaluationResult evaluateAlgorithm(
             String name,
             AlgorithmType type,
             DatasetSplit split,
@@ -91,7 +96,127 @@ public class MovieLensEvaluator {
         System.out.printf("  Coverage: %.4f\n", coverage);
         System.out.printf("  Evaluated users: %d\n", users);
         System.out.printf("  Time: %d ms\n", time);
+
+        return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, coverage, users, time);
     }
+
+    private static void generateHtmlReport(List<EvaluationResult> results, String filePath) throws IOException {
+        StringBuilder html = new StringBuilder();
+        html.append("""
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>推荐系统算法评估报告</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 40px 20px; }
+                    .container { max-width: 1200px; margin: 0 auto; }
+                    .header { text-align: center; color: white; margin-bottom: 40px; }
+                    .header h1 { font-size: 36px; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+                    .card { background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); padding: 30px; margin-bottom: 30px; }
+                    .card-title { font-size: 24px; color: #333; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
+                    .table-container { overflow-x: auto; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { padding: 14px; text-align: center; border-bottom: 1px solid #eee; }
+                    th { background: #f8f9fa; font-weight: 600; color: #333; }
+                    tr:hover { background: #f8f9fa; }
+                    .highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+                    .chart-container { height: 400px; margin: 20px 0; }
+                    .bar-chart { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; padding: 20px; }
+                    .bar-group { display: flex; gap: 8px; align-items: flex-end; }
+                    .bar { width: 35px; border-radius: 6px 6px 0 0; transition: height 0.5s ease; position: relative; }
+                    .bar.precision { background: #667eea; }
+                    .bar.recall { background: #f093fb; }
+                    .bar.ndcg { background: #4facfe; }
+                    .bar.coverage { background: #43e97b; }
+                    .bar-label { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; white-space: nowrap; color: #333; }
+                    .algo-label { text-align: center; margin-top: 10px; font-size: 13px; color: #666; font-weight: 500; }
+                    .legend { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
+                    .legend-item { display: flex; align-items: center; gap: 8px; }
+                    .legend-color { width: 20px; height: 20px; border-radius: 4px; }
+                    .footer { text-align: center; color: white; margin-top: 40px; opacity: 0.8; font-size: 14px; }
+                    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+                    .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; color: white; text-align: center; }
+                    .metric-value { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+                    .metric-label { font-size: 14px; opacity: 0.9; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>📊 推荐系统算法评估报告</h1>
+                        <p>基于MovieLens 100K数据集</p>
+                    </div>
+            """);
+
+        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 评估结果对比</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
+
+        double maxPrecision = results.stream().mapToDouble(r -> r.precision).max().orElse(0);
+        double maxRecall = results.stream().mapToDouble(r -> r.recall).max().orElse(0);
+        double maxNdcg = results.stream().mapToDouble(r -> r.ndcg).max().orElse(0);
+        double maxCoverage = results.stream().mapToDouble(r -> r.coverage).max().orElse(0);
+
+        for (EvaluationResult r : results) {
+            boolean isBest = r.precision == maxPrecision;
+            html.append("<tr").append(isBest ? " class=\"highlight\"" : "").append(">");
+            html.append("<td><strong>").append(r.name).append("</strong></td>");
+            html.append(String.format("<td>%.4f</td>", r.precision));
+            html.append(String.format("<td>%.4f</td>", r.recall));
+            html.append(String.format("<td>%.4f</td>", r.ndcg));
+            html.append(String.format("<td>%.4f</td>", r.coverage));
+            html.append("<td>").append(r.users).append("</td>");
+            html.append("<td>").append(r.time).append("</td>");
+            html.append("</tr>");
+        }
+
+        html.append("</tbody></table></div></div>");
+
+        html.append("<div class=\"card\"><h2 class=\"card-title\">📊 可视化对比</h2><div class=\"chart-container\"><div class=\"bar-chart\">");
+
+        for (EvaluationResult r : results) {
+            html.append("<div style=\"display: flex; flex-direction: column; align-items: center; flex: 1;\"><div class=\"bar-group\">");
+
+            double pHeight = (r.precision / maxPrecision) * 300;
+            double rHeight = (r.recall / maxRecall) * 300;
+            double nHeight = (r.ndcg / maxNdcg) * 300;
+            double cHeight = (r.coverage / maxCoverage) * 300;
+
+            html.append(String.format("<div class=\"bar precision\" style=\"height: %.1fpx\" title=\"精确率: %.4f\"><span class=\"bar-label\">%.3f</span></div>", pHeight, r.precision, r.precision));
+            html.append(String.format("<div class=\"bar recall\" style=\"height: %.1fpx\" title=\"召回率: %.4f\"><span class=\"bar-label\">%.3f</span></div>", rHeight, r.recall, r.recall));
+            html.append(String.format("<div class=\"bar ndcg\" style=\"height: %.1fpx\" title=\"NDCG: %.4f\"><span class=\"bar-label\">%.3f</span></div>", nHeight, r.ndcg, r.ndcg));
+            html.append(String.format("<div class=\"bar coverage\" style=\"height: %.1fpx\" title=\"覆盖率: %.4f\"><span class=\"bar-label\">%.3f</span></div>", cHeight, r.coverage, r.coverage));
+
+            html.append("</div><div class=\"algo-label\">").append(r.name).append("</div></div>");
+        }
+
+        html.append("</div></div><div class=\"legend\"><div class=\"legend-item\"><div class=\"legend-color\" style=\"background: #667eea;\"></div><span>精确率</span></div><div class=\"legend-item\"><div class=\"legend-color\" style=\"background: #f093fb;\"></div><span>召回率</span></div><div class=\"legend-item\"><div class=\"legend-color\" style=\"background: #4facfe;\"></div><span>NDCG</span></div><div class=\"legend-item\"><div class=\"legend-color\" style=\"background: #43e97b;\"></div><span>覆盖率</span></div></div></div>");
+
+        html.append("""
+                <div class="footer">
+                    <p>📅 生成时间：""").append(java.time.LocalDateTime.now()).append("""
+                     | 📁 项目：基于协同过滤的推荐系统</p>
+                </div>
+            </div>
+            </body>
+            </html>
+            """);
+
+        Files.createDirectories(Paths.get(filePath).getParent());
+        Files.writeString(Paths.get(filePath), html.toString());
+    }
+
+    private record EvaluationResult(
+        String name,
+        double precision,
+        double recall,
+        double ndcg,
+        double coverage,
+        int users,
+        long time
+    ) {}
+
 
     private static List<Recommendation> recommend(
             AlgorithmType type,
@@ -109,6 +234,10 @@ public class MovieLensEvaluator {
             }
             case ITEM_BASED -> {
                 List<Recommendation> recs = itemBasedCF.recommend(trainMatrix, userId, topK);
+                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK);
+            }
+            case BEHAVIOR_BASED -> {
+                List<Recommendation> recs = behaviorBasedRecommend(trainMatrix, userId, topK);
                 yield mergeWithPopularFallback(recs, trainMatrix, userId, topK);
             }
             case HYBRID -> blendHybrid(trainMatrix, userId, topK, categoryMap, userBasedCF, itemBasedCF);
@@ -244,6 +373,55 @@ public class MovieLensEvaluator {
             ranked.add(new Recommendation(e.getKey(), score));
         }
         return ranked.stream().sorted().limit(need).collect(Collectors.toList());
+    }
+
+    private static List<Recommendation> behaviorBasedRecommend(
+            Map<Long, Map<Long, Double>> trainMatrix,
+            Long userId,
+            int topK
+    ) {
+        Map<Long, Double> userRatings = trainMatrix.getOrDefault(userId, Collections.emptyMap());
+        if (userRatings.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, Double> itemScores = new HashMap<>();
+        Map<Long, Set<Long>> itemUsers = buildItemUserSet(trainMatrix);
+        Map<Long, Double> itemPopularity = popularityScoreMap(trainMatrix, topK * 3, userRatings.keySet());
+
+        for (Map.Entry<Long, Double> ratedEntry : userRatings.entrySet()) {
+            Long ratedItem = ratedEntry.getKey();
+            double rating = ratedEntry.getValue();
+
+            Set<Long> coUsers = itemUsers.getOrDefault(ratedItem, Collections.emptySet());
+            if (coUsers.isEmpty()) continue;
+
+            double behaviorIntensity = 0.2 + 0.8 * (rating / 5.0);
+
+            for (Map.Entry<Long, Set<Long>> entry : itemUsers.entrySet()) {
+                Long candidate = entry.getKey();
+                if (userRatings.containsKey(candidate)) continue;
+
+                Set<Long> candidateUsers = entry.getValue();
+                int coCount = 0;
+                for (Long u : coUsers) {
+                    if (candidateUsers.contains(u)) coCount++;
+                }
+
+                if (coCount > 0) {
+                    double similarity = (double) coCount / Math.sqrt(coUsers.size() * candidateUsers.size());
+                    double popScore = itemPopularity.getOrDefault(candidate, 0.0);
+                    double finalScore = behaviorIntensity * similarity * (0.6 + 0.4 * popScore);
+                    itemScores.merge(candidate, finalScore, Double::sum);
+                }
+            }
+        }
+
+        return itemScores.entrySet().stream()
+                .map(e -> new Recommendation(e.getKey(), e.getValue()))
+                .sorted()
+                .limit(topK)
+                .collect(Collectors.toList());
     }
 
     private static List<Recommendation> blendHybrid(

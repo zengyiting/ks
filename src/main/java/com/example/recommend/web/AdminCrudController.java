@@ -4,11 +4,15 @@ import com.example.recommend.model.Item;
 import com.example.recommend.model.User;
 import com.example.recommend.service.AdminCrudService;
 import com.example.recommend.service.FileStorageService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 管理员CRUD操作控制器
@@ -160,44 +164,77 @@ public class AdminCrudController {
     }
 
     /**
-     * 用户新增/更新请求记录
-     *
-     * @param username 用户名
-     */
-    public record UserUpsertRequest(String username) {}
-
-    /**
-     * 用户禁用状态更新请求记录
-     *
-     * @param disabled 是否禁用
-     */
-    public record UserDisabledRequest(boolean disabled) {}
-
-    /**
-     * 商品新增/更新请求记录
-     *
-     * @param name 商品名称
-     * @param category 商品分类
-     */
-    public record ItemUpsertRequest(String name, String category) {}
-
-    /**
-     * 用户数据传输对象
-     *
-     * @param id 用户ID
-     * @param username 用户名
-        * @param disabled 是否禁用
-     * @param createdAt 创建时间（字符串格式）
-     */
-    public record UserDto(Long id, String username, boolean disabled, String createdAt) {}
-
-    /**
-     * 商品数据传输对象
+     * 查询商品详情
      *
      * @param id 商品ID
-     * @param name 商品名称
-     * @param category 商品分类
-     * @param createdAt 创建时间（字符串格式）
+     * @return 商品数据传输对象
      */
+    @GetMapping("/items/{id}")
+    public ItemDto getItemById(@PathVariable Long id) {
+        return adminCrudService.getItemById(id)
+                .map(this::toItemDto)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
+    }
+
+    /**
+     * 获取所有分类列表
+     *
+     * @return 分类名称列表
+     */
+    @GetMapping("/categories")
+    public List<String> listCategories() {
+        return adminCrudService.listAllCategories();
+    }
+
+    /**
+     * 根据分类查询商品列表
+     *
+     * @param category 分类名称
+     * @return 商品数据传输对象列表
+     */
+    @GetMapping("/categories/{category}/items")
+    public List<ItemDto> listItemsByCategory(@PathVariable String category) {
+        return adminCrudService.listItemsByCategory(category).stream()
+                .map(this::toItemDto)
+                .toList();
+    }
+
+    /**
+     * 获取分类统计信息
+     *
+     * @return 分类统计信息列表
+     */
+    @GetMapping("/categories/stats")
+    public List<CategoryStatsDto> listCategoryStats() {
+        return adminCrudService.listCategoryStats().stream()
+                .map(stats -> new CategoryStatsDto(stats.category(), stats.count()))
+                .toList();
+    }
+
+    /**
+     * 批量更新商品分类
+     *
+     * @param request 分类更新请求
+     * @return 更新结果
+     */
+    @PutMapping("/categories/batch-update")
+    public ResponseEntity<Map<String, Object>> updateItemsCategory(@RequestBody CategoryUpdateRequest request) {
+        int count = adminCrudService.updateItemsCategory(request.oldCategory(), request.newCategory());
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "分类更新成功",
+                "updatedCount", count
+        ));
+    }
+
+    // 请求DTO
+    public record UserUpsertRequest(String username) {}
+    public record UserDisabledRequest(boolean disabled) {}
+    public record ItemUpsertRequest(String name, String category) {}
+    public record CategoryUpdateRequest(String oldCategory, String newCategory) {}
+
+    // 响应DTO
+    public record UserDto(Long id, String username, boolean disabled, String createdAt) {}
     public record ItemDto(Long id, String name, String category, String imageUrl, String createdAt) {}
+    public record CategoryStatsDto(String category, long count) {}
 }

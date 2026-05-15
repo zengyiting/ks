@@ -198,7 +198,78 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "无效的token");
         }
         User user = userOpt.get();
-        return ResponseEntity.ok(new UserInfoResponse(user.getId(), user.getUsername(), user.getPhone(), user.getEmail()));
+        return ResponseEntity.ok(new UserInfoResponse(user.getId(), user.getUsername(), user.getPhone(), user.getEmail(), user.isDisabled(), user.getCreatedAt()));
+    }
+
+    /**
+     * 获取当前用户信息
+     */
+    @GetMapping("/me")
+    public ResponseEntity<UserInfoResponse> getCurrentUser(@RequestHeader("Authorization") String authorization) {
+        String accessToken = extractToken(authorization);
+        Optional<User> userOpt = authService.validateToken(accessToken);
+        if (userOpt.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "无效的token");
+        }
+        User user = userOpt.get();
+        return ResponseEntity.ok(new UserInfoResponse(user.getId(), user.getUsername(), user.getPhone(), user.getEmail(), user.isDisabled(), user.getCreatedAt()));
+    }
+
+    /**
+     * 更新用户信息
+     */
+    @PutMapping("/me")
+    public ResponseEntity<UserInfoResponse> updateUserInfo(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody UserUpdateRequest request) {
+        String accessToken = extractToken(authorization);
+        Optional<User> userOpt = authService.validateToken(accessToken);
+        if (userOpt.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "无效的token");
+        }
+        Long userId = userOpt.get().getId();
+        User updated = authService.updateUserInfo(userId, request.username(), request.phone(), request.email());
+        return ResponseEntity.ok(new UserInfoResponse(updated.getId(), updated.getUsername(), updated.getPhone(), updated.getEmail(), updated.isDisabled(), updated.getCreatedAt()));
+    }
+
+    /**
+     * 修改密码（需要旧密码）
+     */
+    @PostMapping("/me/change-password")
+    public ResponseEntity<Map<String, String>> changePassword(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody ChangePasswordRequest request) {
+        String accessToken = extractToken(authorization);
+        Optional<User> userOpt = authService.validateToken(accessToken);
+        if (userOpt.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "无效的token");
+        }
+        if (request.oldPassword() == null || request.oldPassword().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "旧密码不能为空");
+        }
+        if (request.newPassword() == null || request.newPassword().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新密码不能为空");
+        }
+        authService.changePassword(userOpt.get().getId(), request.oldPassword(), request.newPassword());
+        return ResponseEntity.ok(Map.of("message", "密码修改成功"));
+    }
+
+    /**
+     * 通过短信验证码重置密码
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPasswordBySms(@RequestBody ResetPasswordRequest request) {
+        if (request.phone() == null || request.phone().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手机号不能为空");
+        }
+        if (request.code() == null || request.code().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码不能为空");
+        }
+        if (request.newPassword() == null || request.newPassword().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新密码不能为空");
+        }
+        authService.resetPasswordBySms(request.phone(), request.code(), request.newPassword());
+        return ResponseEntity.ok(Map.of("message", "密码重置成功"));
     }
 
     private String extractToken(String authorization) {
@@ -218,7 +289,10 @@ public class AuthController {
     public record PhoneRegisterRequest(String phone, String username, String password) {}
     public record EmailRegisterRequest(String email, String code, String username, String password) {}
     public record RefreshTokenRequest(String refreshToken) {}
+    public record UserUpdateRequest(String username, String phone, String email) {}
+    public record ChangePasswordRequest(String oldPassword, String newPassword) {}
+    public record ResetPasswordRequest(String phone, String code, String newPassword) {}
 
     // 响应DTO
-    public record UserInfoResponse(Long id, String username, String phone, String email) {}
+    public record UserInfoResponse(Long id, String username, String phone, String email, Boolean disabled, Object createdAt) {}
 }
