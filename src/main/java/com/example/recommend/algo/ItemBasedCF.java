@@ -5,9 +5,8 @@ import java.util.stream.Collectors;
 
 public class ItemBasedCF implements RecommenderStrategy {
 
-    private static final double MIN_SIMILARITY = 0.0;
-    private static final int TOP_K_SIMILAR_ITEMS = 40;
-    private static final int MIN_OVERLAP = 3;
+    private static final double MIN_SIMILARITY = 0.01;
+    private static final int TOP_K_SIMILAR_ITEMS = 20;
     private static final double GLOBAL_MEAN = 3.5;
 
     private Map<Long, Map<Long, Double>> similarityCache;
@@ -66,7 +65,7 @@ public class ItemBasedCF implements RecommenderStrategy {
                 Long item2 = items.get(j);
                 Map<Long, Double> users2 = itemUsers.get(item2);
 
-                double similarity = SimilarityMetrics.itemSimilarity(users1, users2);
+                double similarity = pearsonCorrelation(users1, users2);
                 if (similarity > MIN_SIMILARITY) {
                     similarityCache.computeIfAbsent(item1, k -> new HashMap<>()).put(item2, similarity);
                     similarityCache.computeIfAbsent(item2, k -> new HashMap<>()).put(item1, similarity);
@@ -76,6 +75,38 @@ public class ItemBasedCF implements RecommenderStrategy {
 
         cacheBuilt = true;
         System.out.println("Similarity cache built: " + similarityCache.size() + " items");
+    }
+
+    private double pearsonCorrelation(Map<Long, Double> users1, Map<Long, Double> users2) {
+        int n = 0;
+        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+
+        Map<Long, Double> smaller = users1.size() <= users2.size() ? users1 : users2;
+        Map<Long, Double> larger = users1.size() <= users2.size() ? users2 : users1;
+
+        for (Map.Entry<Long, Double> entry : smaller.entrySet()) {
+            Long userId = entry.getKey();
+            Double y = larger.get(userId);
+            if (y != null) {
+                double x = entry.getValue();
+                sumX += x;
+                sumY += y;
+                sumXY += x * y;
+                sumX2 += x * x;
+                sumY2 += y * y;
+                n++;
+            }
+        }
+
+        if (n < 3) return 0.0;
+
+        double denominator = Math.sqrt((sumX2 - sumX * sumX / n) * (sumY2 - sumY * sumY / n));
+        if (denominator == 0) return 0.0;
+
+        double numerator = sumXY - sumX * sumY / n;
+        double sim = numerator / denominator;
+        
+        return sim * n / (n + 5);
     }
 
     private Map<Long, Map<Long, Double>> buildItemUsers(Map<Long, Map<Long, Double>> userItem) {
@@ -100,6 +131,7 @@ public class ItemBasedCF implements RecommenderStrategy {
         for (Map.Entry<Long, Double> entry : targetRatings.entrySet()) {
             Long ratedItem = entry.getKey();
             double userRating = entry.getValue();
+            double ratingDeviation = userRating - userAvgRating;
 
             Map<Long, Double> similarItems = similarityCache.getOrDefault(ratedItem, Collections.emptyMap());
 
@@ -113,9 +145,8 @@ public class ItemBasedCF implements RecommenderStrategy {
                 Long candidateItemId = simEntry.getKey();
                 double similarity = simEntry.getValue();
 
-                double weight = similarity;
-                double centeredRating = userRating - userAvgRating;
-                double predictionContribution = weight * (centeredRating + GLOBAL_MEAN);
+                double weight = Math.abs(similarity);
+                double predictionContribution = weight * (userRating - userAvgRating);
                 predictions.merge(candidateItemId, predictionContribution, Double::sum);
                 weightSums.merge(candidateItemId, weight, Double::sum);
             }
@@ -126,7 +157,7 @@ public class ItemBasedCF implements RecommenderStrategy {
             Long itemId = entry.getKey();
             double weightSum = weightSums.getOrDefault(itemId, 0.0);
             if (weightSum > 0) {
-                double predictedRating = entry.getValue() / weightSum;
+                double predictedRating = userAvgRating + entry.getValue() / weightSum;
                 predictedRating = Math.max(1.0, Math.min(5.0, predictedRating));
                 result.put(itemId, predictedRating);
             }
@@ -154,7 +185,7 @@ public class ItemBasedCF implements RecommenderStrategy {
                     double sum = e.getValue()[0];
                     double count = e.getValue()[1];
                     double avgRating = count > 0 ? sum / count : GLOBAL_MEAN;
-                    double popularityScore = (avgRating - 1.0) / 4.0 * Math.log1p(count);
+                    double popularityScore = (avgRating / 5.0) * Math.log(1 + count);
                     return new Recommendation(itemId, popularityScore);
                 })
                 .sorted()
@@ -165,6 +196,7 @@ public class ItemBasedCF implements RecommenderStrategy {
     public void resetCache() {
         cacheBuilt = false;
         similarityCache = null;
-        lastItemUsers = null;
+        lastUserCount = -1;
+        lastItemCount = -1;
     }
 }
