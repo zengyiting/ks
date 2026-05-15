@@ -18,7 +18,7 @@ public class UserBasedCF implements RecommenderStrategy {
 
         Map<Long, Double> targetRatings = userItem.getOrDefault(userId, Collections.emptyMap());
         if (targetRatings.isEmpty()) {
-            return List.of();
+            return fallbackToPopularity(userItem, targetRatings, topN);
         }
 
         List<Neighbor> neighbors = findNeighbors(userItem, targetRatings, userId);
