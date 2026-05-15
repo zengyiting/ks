@@ -6,7 +6,10 @@ import java.util.stream.Collectors;
 public class ItemBasedCF implements RecommenderStrategy {
 
     private static final double MIN_SIMILARITY = 0.001;
-    private static final int TOP_K_SIMILAR_ITEMS = 30;
+    private static final int TOP_K_SIMILAR_ITEMS = 50;
+
+    private Map<Long, Map<Long, Double>> similarityCache;
+    private boolean cacheBuilt = false;
 
     @Override
     public List<Recommendation> recommend(Map<Long, Map<Long, Double>> userItem, Long userId, int topN) {
@@ -24,7 +27,11 @@ public class ItemBasedCF implements RecommenderStrategy {
             return fallbackToPopularity(userItem, topN);
         }
 
-        Map<Long, Double> predictions = predictRatings(targetRatings, itemUsers, userItem);
+        if (!cacheBuilt) {
+            buildSimilarityCache(itemUsers);
+        }
+
+        Map<Long, Double> predictions = predictRatings(targetRatings, itemUsers);
 
         if (predictions.isEmpty()) {
             return fallbackToPopularity(userItem, topN);
@@ -37,40 +44,57 @@ public class ItemBasedCF implements RecommenderStrategy {
                 .collect(Collectors.toList());
     }
 
-    public List<Recommendation> recommend(
-            Map<Long, Map<Long, Double>> userItem,
-            Map<Long, Map<Long, Double>> itemUsers,
-            Long userId,
-            int topN
-    ) {
-        if (userItem == null || userItem.isEmpty() || userId == null || topN <= 0) {
-            return List.of();
+    private void buildSimilarityCache(Map<Long, Map<Long, Double>> itemUsers) {
+        similarityCache = new HashMap<>();
+        List<Long> items = new ArrayList<>(itemUsers.keySet());
+
+        System.out.println("Building item similarity cache...");
+
+        for (int i = 0; i < items.size(); i++) {
+            Long item1 = items.get(i);
+            Map<Long, Double> users1 = itemUsers.get(item1);
+
+            for (int j = i + 1; j < items.size(); j++) {
+                Long item2 = items.get(j);
+                Map<Long, Double> users2 = itemUsers.get(item2);
+
+                double similarity = calculateCosineSimilarity(users1, users2);
+                if (similarity > MIN_SIMILARITY) {
+                    similarityCache.computeIfAbsent(item1, k -> new HashMap<>()).put(item2, similarity);
+                    similarityCache.computeIfAbsent(item2, k -> new HashMap<>()).put(item1, similarity);
+                }
+            }
         }
 
-        Map<Long, Double> targetRatings = userItem.getOrDefault(userId, Collections.emptyMap());
-        if (targetRatings.isEmpty()) {
-            return fallbackToPopularity(userItem, topN);
+        cacheBuilt = true;
+        System.out.println("Similarity cache built: " + similarityCache.size() + " items");
+    }
+
+    private double calculateCosineSimilarity(Map<Long, Double> users1, Map<Long, Double> users2) {
+        double dotProduct = 0.0;
+        double norm1 = 0.0;
+        double norm2 = 0.0;
+
+        for (Map.Entry<Long, Double> entry : users1.entrySet()) {
+            Long userId = entry.getKey();
+            Double rating1 = entry.getValue();
+            Double rating2 = users2.get(userId);
+
+            if (rating2 != null) {
+                dotProduct += rating1 * rating2;
+            }
+            norm1 += rating1 * rating1;
         }
 
-        if (itemUsers == null || itemUsers.isEmpty()) {
-            itemUsers = buildItemUsers(userItem);
+        for (Double rating : users2.values()) {
+            norm2 += rating * rating;
         }
 
-        if (itemUsers.isEmpty()) {
-            return fallbackToPopularity(userItem, topN);
+        if (norm1 == 0 || norm2 == 0) {
+            return 0.0;
         }
 
-        Map<Long, Double> predictions = predictRatings(targetRatings, itemUsers, userItem);
-
-        if (predictions.isEmpty()) {
-            return fallbackToPopularity(userItem, topN);
-        }
-
-        return predictions.entrySet().stream()
-                .map(e -> new Recommendation(e.getKey(), e.getValue()))
-                .sorted()
-                .limit(topN)
-                .collect(Collectors.toList());
+        return dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
     }
 
     private Map<Long, Map<Long, Double>> buildItemUsers(Map<Long, Map<Long, Double>> userItem) {
@@ -86,24 +110,26 @@ public class ItemBasedCF implements RecommenderStrategy {
     }
 
     private Map<Long, Double> predictRatings(Map<Long, Double> targetRatings,
-                                            Map<Long, Map<Long, Double>> itemUsers,
-                                            Map<Long, Map<Long, Double>> userItem) {
+                                             Map<Long, Map<Long, Double>> itemUsers) {
         Map<Long, Double> predictions = new HashMap<>();
         Map<Long, Double> weightSums = new HashMap<>();
 
         double userAvgRating = targetRatings.values().stream().mapToDouble(Double::doubleValue).average().orElse(3.5);
 
-        for (Map.Entry<Long, Double> ratedEntry : targetRatings.entrySet()) {
-            Long ratedItemId = ratedEntry.getKey();
-            double userRating = ratedEntry.getValue();
+        for (Map.Entry<Long, Double> entry : targetRatings.entrySet()) {
+            Long ratedItem = entry.getKey();
+            double userRating = entry.getValue();
             double ratingDeviation = userRating - userAvgRating;
 
-            Map<Long, Double> ratedItemUsers = itemUsers.getOrDefault(ratedItemId, Collections.emptyMap());
-            if (ratedItemUsers.isEmpty()) continue;
+            Map<Long, Double> similarItems = similarityCache.getOrDefault(ratedItem, Collections.emptyMap());
 
-            Map<Long, Double> similarities = computeSimilarities(ratedItemId, ratedItemUsers, itemUsers, targetRatings.keySet());
+            List<Map.Entry<Long, Double>> topSimilarItems = similarItems.entrySet().stream()
+                    .filter(e -> !targetRatings.containsKey(e.getKey()))
+                    .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                    .limit(TOP_K_SIMILAR_ITEMS)
+                    .collect(Collectors.toList());
 
-            for (Map.Entry<Long, Double> simEntry : similarities.entrySet()) {
+            for (Map.Entry<Long, Double> simEntry : topSimilarItems) {
                 Long candidateItemId = simEntry.getKey();
                 double similarity = simEntry.getValue();
 
@@ -126,60 +152,6 @@ public class ItemBasedCF implements RecommenderStrategy {
         }
 
         return result;
-    }
-
-    private Map<Long, Double> computeSimilarities(Long sourceItem,
-                                                  Map<Long, Double> sourceUsers,
-                                                  Map<Long, Map<Long, Double>> itemUsers,
-                                                  Set<Long> excludeItems) {
-        Map<Long, Double> similarities = new HashMap<>();
-
-        int sourceSize = sourceUsers.size();
-        if (sourceSize == 0) return similarities;
-
-        for (Map.Entry<Long, Map<Long, Double>> entry : itemUsers.entrySet()) {
-            Long candidateItem = entry.getKey();
-            if (candidateItem.equals(sourceItem) || excludeItems.contains(candidateItem)) {
-                continue;
-            }
-
-            Map<Long, Double> candidateUsers = entry.getValue();
-            int candidateSize = candidateUsers.size();
-
-            int overlap = 0;
-            double dotProduct = 0.0;
-            double normSource = 0.0;
-            double normCandidate = 0.0;
-
-            for (Map.Entry<Long, Double> sourceEntry : sourceUsers.entrySet()) {
-                Long userId = sourceEntry.getKey();
-                Double candidateRating = candidateUsers.get(userId);
-                
-                if (candidateRating != null) {
-                    overlap++;
-                    double sourceRating = sourceEntry.getValue();
-                    dotProduct += sourceRating * candidateRating;
-                    normSource += sourceRating * sourceRating;
-                    normCandidate += candidateRating * candidateRating;
-                }
-            }
-
-            if (overlap < 1) continue;
-
-            double similarity = 0.0;
-            if (normSource > 0 && normCandidate > 0) {
-                similarity = dotProduct / (Math.sqrt(normSource) * Math.sqrt(normCandidate));
-            }
-
-            if (similarity > MIN_SIMILARITY) {
-                similarities.put(candidateItem, similarity);
-            }
-        }
-
-        return similarities.entrySet().stream()
-                .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
-                .limit(TOP_K_SIMILAR_ITEMS)
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
     private List<Recommendation> fallbackToPopularity(Map<Long, Map<Long, Double>> userItem, int topN) {

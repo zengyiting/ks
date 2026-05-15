@@ -11,11 +11,11 @@ public class MovieLensEvaluator {
 
     public static void main(String[] args) throws IOException {
         String dataPath = "docs/ml-100k/u.data";
-        double sampleRatio = 0.3;
+        double sampleRatio = 1.0;
 
         System.out.println("=== MovieLens Evaluator ===");
         System.out.println("Loading data from: " + dataPath);
-        System.out.println("Sample ratio: " + (sampleRatio * 100) + "%");
+        System.out.println("Sample ratio: " + (sampleRatio * 100) + "% (完整数据)");
 
         Map<Long, Map<Long, Double>> matrix = loadRatings(dataPath, sampleRatio);
         Map<Long, String> categoryMap = new HashMap<>();
