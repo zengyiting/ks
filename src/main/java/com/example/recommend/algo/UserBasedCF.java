@@ -60,7 +60,7 @@ public class UserBasedCF implements RecommenderStrategy {
             }
             if (overlap < MIN_OVERLAP) continue;
 
-            double similarity = cosineSimilarity(targetRatings, otherRatings);
+            double similarity = pearsonCorrelation(targetRatings, otherRatings);
 
             if (similarity <= MIN_SIMILARITY) continue;
 
@@ -73,24 +73,32 @@ public class UserBasedCF implements RecommenderStrategy {
         return neighbors.subList(0, neighborLimit);
     }
 
-    private double cosineSimilarity(Map<Long, Double> a, Map<Long, Double> b) {
-        double dotProduct = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
+    private double pearsonCorrelation(Map<Long, Double> a, Map<Long, Double> b) {
+        int n = 0;
+        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
 
         for (Map.Entry<Long, Double> entry : a.entrySet()) {
             Long itemId = entry.getKey();
             Double ratingB = b.get(itemId);
             if (ratingB != null) {
-                dotProduct += entry.getValue() * ratingB;
-                normA += entry.getValue() * entry.getValue();
-                normB += ratingB * ratingB;
+                double x = entry.getValue();
+                double y = ratingB;
+                sumX += x;
+                sumY += y;
+                sumXY += x * y;
+                sumX2 += x * x;
+                sumY2 += y * y;
+                n++;
             }
         }
 
-        if (normA == 0 || normB == 0) return 0.0;
+        if (n < 2) return 0.0;
 
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+        double denominator = Math.sqrt((sumX2 - sumX * sumX / n) * (sumY2 - sumY * sumY / n));
+        if (denominator == 0) return 0.0;
+
+        double numerator = sumXY - sumX * sumY / n;
+        return numerator / denominator;
     }
 
     private Map<Long, Double> predictRatings(List<Neighbor> neighbors,
