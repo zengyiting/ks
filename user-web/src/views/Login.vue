@@ -240,8 +240,8 @@ const goToRegister = () => {
           <div class="login-hint">
             <template v-if="loginType === 'sms'">验证码登录，未注册将自动创建账号。</template>
             <template v-else-if="loginType === 'phone'">若手机号未注册，将自动创建账号。</template>
-            <template v-else-if="loginType === 'email'">若邮箱未注册，将自动创建账号。</template>
-            <template v-else>若用户名未注册，将自动创建账号。</template>
+            <template v-else-if="loginType === 'email'">请先注册邮箱账号。</template>
+            <template v-else>请先注册用户名账号。</template>
           </div>
         </form>
 
