@@ -1,10 +1,12 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUser } from '../composables/useUser.js';
 
 const router = useRouter();
 const { currentUser, isLoggedIn, userId, logout } = useUser();
+const searchQuery = ref('');
+const showSearch = ref(false);
 
 const maskPhone = (phone) => {
   if (!phone) return '';
@@ -26,6 +28,17 @@ const handleLogout = () => {
   logout();
   router.push('/');
 };
+
+const handleSearch = () => {
+  if (searchQuery.value.trim()) {
+    router.push({ name: 'search', query: { q: searchQuery.value.trim() } });
+    showSearch.value = false;
+  }
+};
+
+const toggleSearch = () => {
+  showSearch.value = !showSearch.value;
+};
 </script>
 
 <template>
@@ -38,11 +51,29 @@ const handleLogout = () => {
       </div>
     </div>
 
-    <nav class="nav-links">
-      <RouterLink to="/">首页</RouterLink>
-      <RouterLink to="/favorites">收藏</RouterLink>
-      <RouterLink to="/cart">购物袋</RouterLink>
-    </nav>
+    <div class="nav-center">
+      <nav class="nav-links">
+        <RouterLink to="/">首页</RouterLink>
+        <RouterLink to="/search">搜索</RouterLink>
+        <RouterLink to="/favorites">收藏</RouterLink>
+        <RouterLink to="/cart">购物袋</RouterLink>
+      </nav>
+      <div class="nav-search">
+        <input
+          v-model="searchQuery"
+          class="search-input"
+          type="text"
+          placeholder="搜索商品..."
+          @keyup.enter="handleSearch"
+        />
+        <button class="search-btn" @click="handleSearch">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+        </button>
+      </div>
+    </div>
 
     <div class="auth-panel">
       <div>
@@ -51,6 +82,7 @@ const handleLogout = () => {
         <div class="auth-meta">{{ displayMeta }}</div>
       </div>
       <div class="auth-actions">
+        <RouterLink v-if="isLoggedIn" class="btn-ghost" to="/profile">我的</RouterLink>
         <RouterLink v-if="!isLoggedIn" class="btn-ghost" to="/register">注册</RouterLink>
         <RouterLink v-if="!isLoggedIn" class="btn-primary" to="/login">登录</RouterLink>
         <RouterLink v-else class="btn-ghost" to="/login">切换</RouterLink>

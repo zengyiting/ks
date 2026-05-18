@@ -32,6 +32,7 @@ const exploreVisibleCount = ref(EXPLORE_INITIAL_BATCH);
 const recommendationScroller = ref(null);
 const exploreScroller = ref(null);
 const sidebarImageErrors = ref(new Set());
+const exploreLoaded = ref(false);
 
 const getSafeImage = (item) => {
   if (sidebarImageErrors.value.has(item.id)) return '/images/placeholder.svg';
@@ -179,6 +180,7 @@ const loadExplore = async () => {
     const data = await apiGet(`/api/catalog/items?limit=${EXPLORE_MAX_ITEMS}`);
     exploreItems.value = (data || []).slice(0, EXPLORE_MAX_ITEMS);
     exploreVisibleCount.value = EXPLORE_INITIAL_BATCH;
+    exploreLoaded.value = true;
   } catch (err) {
     status.value = err.message;
   }
@@ -358,7 +360,11 @@ onMounted(async () => {
           </div>
 
           <div class="feed-scroll feed-scroll-explore" ref="exploreScroller" @scroll.passive="onExploreScroll">
-            <div v-if="visibleExploreItems.length === 0" class="empty-state">暂无推荐</div>
+            <div v-if="visibleExploreItems.length === 0 && !exploreLoaded" class="loading-state">
+              <div class="spinner"></div>
+              <span>探索商品加载中...</span>
+            </div>
+            <div v-else-if="visibleExploreItems.length === 0" class="empty-state">暂无商品</div>
             <div v-else class="card-grid">
               <ItemCard
                 v-for="(item, index) in visibleExploreItems"

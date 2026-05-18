@@ -5,6 +5,8 @@ import Favorites from '../views/Favorites.vue';
 import Cart from '../views/Cart.vue';
 import Login from '../views/Login.vue';
 import Register from '../views/Register.vue';
+import Search from '../views/Search.vue';
+import Profile from '../views/Profile.vue';
 
 const routes = [
   { path: '/', name: 'home', component: Home },
@@ -12,7 +14,9 @@ const routes = [
   { path: '/register', name: 'register', component: Register },
   { path: '/item/:id', name: 'item', component: ItemDetail },
   { path: '/favorites', name: 'favorites', component: Favorites, meta: { requiresAuth: true } },
-  { path: '/cart', name: 'cart', component: Cart, meta: { requiresAuth: true } }
+  { path: '/cart', name: 'cart', component: Cart, meta: { requiresAuth: true } },
+  { path: '/search', name: 'search', component: Search },
+  { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true } }
 ];
 
 const router = createRouter({

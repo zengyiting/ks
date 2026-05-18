@@ -113,6 +113,28 @@ public class CatalogController {
             .toList();
     }
 
+    @DeleteMapping("/users/{userId}/favorites/{itemId}")
+    public Map<String, Object> removeFavorite(@PathVariable Long userId, @PathVariable Long itemId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        UserItemFlag flag = userItemFlagRepository.findByUserIdAndItemId(userId, itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "收藏不存在"));
+        flag.setFavorite(false);
+        userItemFlagRepository.save(flag);
+        return Map.of("success", true, "message", "已取消收藏");
+    }
+
+    @DeleteMapping("/users/{userId}/cart/{itemId}")
+    public Map<String, Object> removeCart(@PathVariable Long userId, @PathVariable Long itemId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        UserItemFlag flag = userItemFlagRepository.findByUserIdAndItemId(userId, itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "购物袋记录不存在"));
+        flag.setInCart(false);
+        userItemFlagRepository.save(flag);
+        return Map.of("success", true, "message", "已从购物袋移除");
+    }
+
     private List<ItemDto> mapFlagsToItems(List<UserItemFlag> flags) {
         if (flags.isEmpty()) {
             return List.of();
