@@ -11,7 +11,7 @@ import Toast from './components/Toast.vue';
         <router-view />
       </main>
       <footer class="app-footer">
-        <span>轻选集推荐实验室 · Spring Boot + Vue3</span>
+        <span>基于协同过滤的商品推荐系统 · Spring Boot + Vue3</span>
       </footer>
     </div>
     <Toast />

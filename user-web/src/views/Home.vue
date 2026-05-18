@@ -56,7 +56,7 @@ const maskPhone = (phone) => {
 };
 
 const greeting = computed(() => {
-  if (!currentUser.value) return '欢迎来到轻选集';
+  if (!currentUser.value) return '欢迎来到推荐系统';
   const name = currentUser.value.username || maskPhone(currentUser.value.phone) || `用户 ${userId.value}`;
   return `${name}，欢迎回来`;
 });
@@ -64,7 +64,7 @@ const greeting = computed(() => {
 const heroTip = computed(() => {
   if (!isLoggedIn.value) {
     return {
-      title: '轻选提示',
+      title: '系统提示',
       content: '登录后开启个性化推荐与评分，让算法更贴合你的节奏。'
     };
   }
@@ -304,7 +304,7 @@ onMounted(async () => {
         <section class="feed-block">
           <div class="section-header">
             <div>
-              <h3 class="section-title">轻选集推荐</h3>
+              <h3 class="section-title">个性化推荐</h3>
               <div class="section-subtitle">Strong Relevance · 协同过滤优先高相似结果</div>
             </div>
             <div class="selector">

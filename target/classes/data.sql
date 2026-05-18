@@ -7,12 +7,12 @@ INSERT INTO users (id, username) VALUES
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 INSERT INTO items (id, name, category, image_url) VALUES
-  (101, '《算法导论》', 'books', '/images/seed/book-1.svg'),
-  (102, '《Java 编程思想》', 'books', '/images/seed/book-2.svg'),
-  (103, '《机器学习》', 'books', '/images/seed/book-3.svg'),
-  (201, '机械键盘', 'electronics', '/images/seed/device-1.svg'),
-  (202, '降噪耳机', 'electronics', '/images/seed/device-2.svg'),
-  (203, '人体工学椅', 'furniture', NULL)
+  (101, '《算法导论》', 'books', 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=300&fit=crop'),
+  (102, '《Java 编程思想》', 'books', 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=300&fit=crop'),
+  (103, '《机器学习》', 'books', 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop'),
+  (201, '机械键盘', 'electronics', 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=300&fit=crop'),
+  (202, '降噪耳机', 'electronics', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop'),
+  (203, '人体工学椅', 'furniture', 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400&h=300&fit=crop')
 ON DUPLICATE KEY UPDATE name = VALUES(name), category = VALUES(category), image_url = VALUES(image_url);
 
 -- 评分：0-5
