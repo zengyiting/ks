@@ -80,20 +80,24 @@ onMounted(() => {
       <span>加载中...</span>
     </div>
     <div v-else-if="items.length === 0" class="empty-state">暂无收藏，去首页挑选喜欢的商品吧。</div>
-    <div v-else class="card-grid">
-      <ItemCard
-        v-for="(item, index) in items"
-        :key="item.id"
-        :item="item"
-        meta-label="平均评分"
-        :meta-value="item.avgScore.toFixed(1)"
-        :favorite="true"
-        :actions-disabled="!isLoggedIn"
-        :style="{ '--delay': `${index * 40}ms` }"
-        @open="openItem(item)"
-        @favorite="() => {}"
-        @cart="() => {}"
-      />
+    <div v-else class="feed-block">
+      <div class="feed-scroll feed-scroll-favorites">
+        <div class="card-grid">
+          <ItemCard
+            v-for="(item, index) in items"
+            :key="item.id"
+            :item="item"
+            meta-label="平均评分"
+            :meta-value="item.avgScore.toFixed(1)"
+            :favorite="true"
+            :actions-disabled="!isLoggedIn"
+            :style="{ '--delay': `${index * 40}ms` }"
+            @open="openItem(item)"
+            @favorite="() => {}"
+            @cart="() => {}"
+          />
+        </div>
+      </div>
     </div>
 
     <div class="status-line" v-if="status">{{ status }}</div>

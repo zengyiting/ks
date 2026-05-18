@@ -47,7 +47,7 @@ const toggleSearch = () => {
       <div class="brand-mark"></div>
       <div>
         <h1 class="brand-title">基于协同过滤的商品推荐系统</h1>
-        <div class="brand-subtitle">Collaborative Filtering · Recommendation System</div>
+        <div class="brand-subtitle">Collaborative Filtering Recommendation System</div>
       </div>
     </div>
 

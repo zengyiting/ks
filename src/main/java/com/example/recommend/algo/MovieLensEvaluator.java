@@ -659,11 +659,11 @@ public class MovieLensEvaluator {
         candidates.addAll(contentScore.keySet());
         candidates.removeAll(rated);
 
-        double itemCfWeight = 0.40;
-        double userCfWeight = 0.25;
-        double popWeight = 0.15;
-        double assocWeight = 0.12;
-        double contentWeight = 0.08;
+        double itemCfWeight = 0.50;
+        double userCfWeight = 0.15;
+        double popWeight = 0.12;
+        double assocWeight = 0.13;
+        double contentWeight = 0.10;
 
         List<Recommendation> merged = new ArrayList<>();
         for (Long itemId : candidates) {
@@ -713,11 +713,11 @@ public class MovieLensEvaluator {
         candidates.addAll(contentScore.keySet());
         candidates.removeAll(rated);
 
-        double itemCfWeight = 0.40;
-        double userCfWeight = 0.25;
-        double popWeight = 0.15;
-        double assocWeight = 0.12;
-        double contentWeight = 0.08;
+        double itemCfWeight = 0.50;
+        double userCfWeight = 0.15;
+        double popWeight = 0.12;
+        double assocWeight = 0.13;
+        double contentWeight = 0.10;
 
         double totalWeight = 0;
         if (useItemCF) totalWeight += itemCfWeight;

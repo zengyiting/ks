@@ -95,21 +95,25 @@ onMounted(() => {
 
     <div v-else-if="items.length > 0" class="search-results">
       <div class="result-count">找到 {{ items.length }} 件相关商品</div>
-      <div class="card-grid">
-        <ItemCard
-          v-for="(item, index) in items"
-          :key="item.id"
-          :item="item"
-          meta-label="平均评分"
-          :meta-value="item.avgScore.toFixed(1)"
-          :favorite="false"
-          :in-cart="false"
-          :actions-disabled="!isLoggedIn"
-          :style="{ '--delay': `${index * 40}ms` }"
-          @open="openItem(item)"
-          @favorite="() => {}"
-          @cart="() => {}"
-        />
+      <div class="feed-block">
+        <div class="feed-scroll feed-scroll-search">
+          <div class="card-grid">
+            <ItemCard
+              v-for="(item, index) in items"
+              :key="item.id"
+              :item="item"
+              meta-label="平均评分"
+              :meta-value="item.avgScore.toFixed(1)"
+              :favorite="false"
+              :in-cart="false"
+              :actions-disabled="!isLoggedIn"
+              :style="{ '--delay': `${index * 40}ms` }"
+              @open="openItem(item)"
+              @favorite="() => {}"
+              @cart="() => {}"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
