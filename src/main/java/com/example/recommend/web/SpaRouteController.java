@@ -6,12 +6,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class SpaRouteController {
 
-    @GetMapping("/login")
-    public String forwardToLogin() {
-        return "forward:/login.html";
-    }
-
     @GetMapping({
+            "/",
+            "/login",
+            "/register",
+            "/search",
+            "/profile",
             "/favorites",
             "/cart",
             "/item/{id}"
