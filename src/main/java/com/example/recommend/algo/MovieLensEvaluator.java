@@ -38,6 +38,13 @@ public class MovieLensEvaluator {
         results.add(evaluateAlgorithm("Behavior-Based", AlgorithmType.BEHAVIOR_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
         results.add(evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, categoryMap, 10, userBasedCF, itemBasedCF));
 
+        System.out.println("\n=== Starting Ablation Study ===");
+        results.add(evaluateAblation("Hybrid w/o UserCF", split, categoryMap, 10, userBasedCF, itemBasedCF, false, true, true, true));
+        results.add(evaluateAblation("Hybrid w/o ItemCF", split, categoryMap, 10, userBasedCF, itemBasedCF, true, false, true, true));
+        results.add(evaluateAblation("Hybrid w/o Popularity", split, categoryMap, 10, userBasedCF, itemBasedCF, true, true, false, true));
+        results.add(evaluateAblation("Hybrid w/o Association", split, categoryMap, 10, userBasedCF, itemBasedCF, true, true, true, false));
+        results.add(evaluateAblation("Hybrid w/o Dynamic Weights", split, categoryMap, 10, userBasedCF, itemBasedCF, true, true, true, true));
+
         generateHtmlReport(results, "reports/offline-eval/movielens-evaluation-report.html");
         System.out.println("\nReport saved to: reports/offline-eval/movielens-evaluation-report.html");
     }
@@ -100,6 +107,72 @@ public class MovieLensEvaluator {
         return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, coverage, users, time);
     }
 
+    private static EvaluationResult evaluateAblation(
+            String name,
+            DatasetSplit split,
+            Map<Long, String> categoryMap,
+            int topK,
+            UserBasedCF userBasedCF,
+            ItemBasedCF itemBasedCF,
+            boolean useUserCF,
+            boolean useItemCF,
+            boolean usePopularity,
+            boolean useAssociation
+    ) {
+        System.out.println("\nEvaluating: " + name);
+        long start = System.currentTimeMillis();
+
+        double precision = 0.0;
+        double recall = 0.0;
+        double ndcg = 0.0;
+        Set<Long> coveredItems = new HashSet<>();
+        int users = 0;
+
+        for (Map.Entry<Long, Set<Long>> entry : split.testRelevant().entrySet()) {
+            Long userId = entry.getKey();
+            Set<Long> relevant = new HashSet<>(entry.getValue());
+            if (relevant.isEmpty()) continue;
+
+            Set<Long> trainItems = split.trainMatrix().getOrDefault(userId, Collections.emptyMap()).keySet();
+            relevant.removeAll(trainItems);
+            if (relevant.isEmpty()) continue;
+
+            List<Recommendation> recs;
+            if (name.equals("Hybrid w/o Dynamic Weights")) {
+                recs = blendHybridFixedWeights(split.trainMatrix(), userId, topK, categoryMap, userBasedCF, itemBasedCF, useUserCF, useItemCF, usePopularity, useAssociation);
+            } else {
+                recs = blendHybridAblation(split.trainMatrix(), userId, topK, categoryMap, userBasedCF, itemBasedCF, useUserCF, useItemCF, usePopularity, useAssociation);
+            }
+            List<Long> topItems = recs.stream().limit(topK).map(Recommendation::getItemId).collect(Collectors.toList());
+            coveredItems.addAll(topItems);
+
+            int hit = 0;
+            for (Long itemId : topItems) {
+                if (relevant.contains(itemId)) hit++;
+            }
+            precision += ((double) hit) / topK;
+            recall += ((double) hit) / relevant.size();
+            ndcg += ndcgAtK(topItems, relevant, topK);
+            users++;
+        }
+
+        double coverage = ((double) coveredItems.size()) / split.candidateItems().size();
+        long time = System.currentTimeMillis() - start;
+
+        double avgPrecision = users == 0 ? 0.0 : precision / users;
+        double avgRecall = users == 0 ? 0.0 : recall / users;
+        double avgNdcg = users == 0 ? 0.0 : ndcg / users;
+
+        System.out.printf("  Precision@%d: %.4f\n", topK, avgPrecision);
+        System.out.printf("  Recall@%d: %.4f\n", topK, avgRecall);
+        System.out.printf("  NDCG@%d: %.4f\n", topK, avgNdcg);
+        System.out.printf("  Coverage: %.4f\n", coverage);
+        System.out.printf("  Evaluated users: %d\n", users);
+        System.out.printf("  Time: %d ms\n", time);
+
+        return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, coverage, users, time);
+    }
+
     private static void generateHtmlReport(List<EvaluationResult> results, String filePath) throws IOException {
         StringBuilder html = new StringBuilder();
         html.append("""
@@ -112,7 +185,7 @@ public class MovieLensEvaluator {
                 <style>
                     * { margin: 0; padding: 0; box-sizing: border-box; }
                     body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 40px 20px; }
-                    .container { max-width: 1200px; margin: 0 auto; }
+                    .container { max-width: 1400px; margin: 0 auto; }
                     .header { text-align: center; color: white; margin-bottom: 40px; }
                     .header h1 { font-size: 36px; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
                     .card { background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); padding: 30px; margin-bottom: 30px; }
@@ -123,6 +196,7 @@ public class MovieLensEvaluator {
                     th { background: #f8f9fa; font-weight: 600; color: #333; }
                     tr:hover { background: #f8f9fa; }
                     .highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+                    .ablation { background: #f0f7ff; }
                     .chart-container { height: 400px; margin: 20px 0; }
                     .bar-chart { display: flex; align-items: flex-end; justify-content: space-around; height: 100%; padding: 20px; }
                     .bar-group { display: flex; gap: 8px; align-items: flex-end; }
@@ -132,7 +206,7 @@ public class MovieLensEvaluator {
                     .bar.ndcg { background: #4facfe; }
                     .bar.coverage { background: #43e97b; }
                     .bar-label { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; white-space: nowrap; color: #333; }
-                    .algo-label { text-align: center; margin-top: 10px; font-size: 13px; color: #666; font-weight: 500; }
+                    .algo-label { text-align: center; margin-top: 10px; font-size: 12px; color: #666; font-weight: 500; word-break: break-all; max-width: 120px; }
                     .legend { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
                     .legend-item { display: flex; align-items: center; gap: 8px; }
                     .legend-color { width: 20px; height: 20px; border-radius: 4px; }
@@ -141,26 +215,54 @@ public class MovieLensEvaluator {
                     .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; color: white; text-align: center; }
                     .metric-value { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
                     .metric-label { font-size: 14px; opacity: 0.9; }
+                    .section-divider { margin: 30px 0; border-top: 2px dashed #ddd; }
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
                         <h1>📊 推荐系统算法评估报告</h1>
-                        <p>基于MovieLens 100K数据集</p>
+                        <p>基于MovieLens 100K数据集 | 含消融实验</p>
                     </div>
             """);
 
-        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 评估结果对比</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
+        List<EvaluationResult> mainResults = results.subList(0, 4);
+        List<EvaluationResult> ablationResults = results.subList(4, results.size());
 
-        double maxPrecision = results.stream().mapToDouble(r -> r.precision).max().orElse(0);
-        double maxRecall = results.stream().mapToDouble(r -> r.recall).max().orElse(0);
-        double maxNdcg = results.stream().mapToDouble(r -> r.ndcg).max().orElse(0);
-        double maxCoverage = results.stream().mapToDouble(r -> r.coverage).max().orElse(0);
+        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 主要算法评估结果</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
 
-        for (EvaluationResult r : results) {
-            boolean isBest = r.precision == maxPrecision;
+        double maxPrecisionMain = mainResults.stream().mapToDouble(r -> r.precision).max().orElse(0);
+        double maxRecallMain = mainResults.stream().mapToDouble(r -> r.recall).max().orElse(0);
+        double maxNdcgMain = mainResults.stream().mapToDouble(r -> r.ndcg).max().orElse(0);
+        double maxCoverageMain = mainResults.stream().mapToDouble(r -> r.coverage).max().orElse(0);
+
+        for (EvaluationResult r : mainResults) {
+            boolean isBest = r.precision == maxPrecisionMain;
             html.append("<tr").append(isBest ? " class=\"highlight\"" : "").append(">");
+            html.append("<td><strong>").append(r.name).append("</strong></td>");
+            html.append(String.format("<td>%.4f</td>", r.precision));
+            html.append(String.format("<td>%.4f</td>", r.recall));
+            html.append(String.format("<td>%.4f</td>", r.ndcg));
+            html.append(String.format("<td>%.4f</td>", r.coverage));
+            html.append("<td>").append(r.users).append("</td>");
+            html.append("<td>").append(r.time).append("</td>");
+            html.append("</tr>");
+        }
+
+        html.append("</tbody></table></div></div>");
+
+        html.append("<div class=\"section-divider\"></div>");
+
+        html.append("<div class=\"card\"><h2 class=\"card-title\">🔬 消融实验结果</h2><div class=\"table-container\"><table><thead><tr><th>算法变体</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
+
+        double maxPrecisionAblation = ablationResults.stream().mapToDouble(r -> r.precision).max().orElse(0);
+        double maxRecallAblation = ablationResults.stream().mapToDouble(r -> r.recall).max().orElse(0);
+        double maxNdcgAblation = ablationResults.stream().mapToDouble(r -> r.ndcg).max().orElse(0);
+        double maxCoverageAblation = ablationResults.stream().mapToDouble(r -> r.coverage).max().orElse(0);
+
+        for (EvaluationResult r : ablationResults) {
+            boolean isBest = r.precision == maxPrecisionAblation;
+            html.append("<tr").append(isBest ? " class=\"highlight\"" : " class=\"ablation\"").append(">");
             html.append("<td><strong>").append(r.name).append("</strong></td>");
             html.append(String.format("<td>%.4f</td>", r.precision));
             html.append(String.format("<td>%.4f</td>", r.recall));
@@ -178,10 +280,10 @@ public class MovieLensEvaluator {
         for (EvaluationResult r : results) {
             html.append("<div style=\"display: flex; flex-direction: column; align-items: center; flex: 1;\"><div class=\"bar-group\">");
 
-            double pHeight = (r.precision / maxPrecision) * 300;
-            double rHeight = (r.recall / maxRecall) * 300;
-            double nHeight = (r.ndcg / maxNdcg) * 300;
-            double cHeight = (r.coverage / maxCoverage) * 300;
+            double pHeight = (r.precision / maxPrecisionMain) * 300;
+            double rHeight = (r.recall / maxRecallMain) * 300;
+            double nHeight = (r.ndcg / maxNdcgMain) * 300;
+            double cHeight = (r.coverage / maxCoverageMain) * 300;
 
             html.append(String.format("<div class=\"bar precision\" style=\"height: %.1fpx\" title=\"精确率: %.4f\"><span class=\"bar-label\">%.3f</span></div>", pHeight, r.precision, r.precision));
             html.append(String.format("<div class=\"bar recall\" style=\"height: %.1fpx\" title=\"召回率: %.4f\"><span class=\"bar-label\">%.3f</span></div>", rHeight, r.recall, r.recall));
@@ -450,12 +552,121 @@ public class MovieLensEvaluator {
         candidates.addAll(associationScore.keySet());
         candidates.removeAll(rated);
 
+        int activityLevel = rated.size();
+        double normalizedActivity = Math.min(1.0, activityLevel / 20.0);
+        double sigmoid = 1.0 / (1.0 + Math.exp(-10.0 * (normalizedActivity - 0.4)));
+        double itemCfWeight = 0.35 + 0.10 * sigmoid;
+        double userCfWeight = 0.25 + 0.10 * sigmoid;
+        double popWeight = 0.20 - 0.10 * sigmoid;
+        double assocWeight = 0.20;
+
         List<Recommendation> merged = new ArrayList<>();
         for (Long itemId : candidates) {
-            double score = 0.35 * itemRankScore.getOrDefault(itemId, 0.0)
-                    + 0.25 * userRankScore.getOrDefault(itemId, 0.0)
-                    + 0.20 * popScore.getOrDefault(itemId, 0.0)
-                    + 0.20 * associationScore.getOrDefault(itemId, 0.0);
+            double score = itemCfWeight * itemRankScore.getOrDefault(itemId, 0.0)
+                    + userCfWeight * userRankScore.getOrDefault(itemId, 0.0)
+                    + popWeight * popScore.getOrDefault(itemId, 0.0)
+                    + assocWeight * associationScore.getOrDefault(itemId, 0.0);
+            if (score > 1e-12) {
+                merged.add(new Recommendation(itemId, score));
+            }
+        }
+
+        return mergeWithPopularFallback(merged.stream().sorted().collect(Collectors.toList()), trainMatrix, userId, topN);
+    }
+
+    private static List<Recommendation> blendHybridAblation(
+            Map<Long, Map<Long, Double>> trainMatrix,
+            Long userId,
+            int topN,
+            Map<Long, String> categoryMap,
+            UserBasedCF userBasedCF,
+            ItemBasedCF itemBasedCF,
+            boolean useUserCF,
+            boolean useItemCF,
+            boolean usePopularity,
+            boolean useAssociation
+    ) {
+        Set<Long> rated = trainMatrix.getOrDefault(userId, Collections.emptyMap()).keySet();
+        int poolSize = Math.max(topN * 5, 20);
+
+        List<Recommendation> itemRecs = useItemCF ? itemBasedCF.recommend(trainMatrix, userId, poolSize) : Collections.emptyList();
+        List<Recommendation> userRecs = useUserCF ? userBasedCF.recommend(trainMatrix, userId, poolSize) : Collections.emptyList();
+
+        Map<Long, Double> itemRankScore = rankScoreMap(itemRecs);
+        Map<Long, Double> userRankScore = rankScoreMap(userRecs);
+        Map<Long, Double> popScore = usePopularity ? popularityScoreMap(trainMatrix, poolSize, rated) : Map.of();
+        Map<Long, Double> associationScore = useAssociation ? associationScoreMap(trainMatrix, userId, poolSize) : Map.of();
+
+        Set<Long> candidates = new HashSet<>();
+        candidates.addAll(itemRankScore.keySet());
+        candidates.addAll(userRankScore.keySet());
+        candidates.addAll(popScore.keySet());
+        candidates.addAll(associationScore.keySet());
+        candidates.removeAll(rated);
+
+        int activityLevel = rated.size();
+        double normalizedActivity = Math.min(1.0, activityLevel / 20.0);
+        double sigmoid = 1.0 / (1.0 + Math.exp(-10.0 * (normalizedActivity - 0.4)));
+        double itemCfWeight = 0.35 + 0.10 * sigmoid;
+        double userCfWeight = 0.25 + 0.10 * sigmoid;
+        double popWeight = 0.20 - 0.10 * sigmoid;
+        double assocWeight = 0.20;
+
+        List<Recommendation> merged = new ArrayList<>();
+        for (Long itemId : candidates) {
+            double score = (useItemCF ? itemCfWeight * itemRankScore.getOrDefault(itemId, 0.0) : 0.0)
+                    + (useUserCF ? userCfWeight * userRankScore.getOrDefault(itemId, 0.0) : 0.0)
+                    + (usePopularity ? popWeight * popScore.getOrDefault(itemId, 0.0) : 0.0)
+                    + (useAssociation ? assocWeight * associationScore.getOrDefault(itemId, 0.0) : 0.0);
+            if (score > 1e-12) {
+                merged.add(new Recommendation(itemId, score));
+            }
+        }
+
+        return mergeWithPopularFallback(merged.stream().sorted().collect(Collectors.toList()), trainMatrix, userId, topN);
+    }
+
+    private static List<Recommendation> blendHybridFixedWeights(
+            Map<Long, Map<Long, Double>> trainMatrix,
+            Long userId,
+            int topN,
+            Map<Long, String> categoryMap,
+            UserBasedCF userBasedCF,
+            ItemBasedCF itemBasedCF,
+            boolean useUserCF,
+            boolean useItemCF,
+            boolean usePopularity,
+            boolean useAssociation
+    ) {
+        Set<Long> rated = trainMatrix.getOrDefault(userId, Collections.emptyMap()).keySet();
+        int poolSize = Math.max(topN * 5, 20);
+
+        List<Recommendation> itemRecs = useItemCF ? itemBasedCF.recommend(trainMatrix, userId, poolSize) : Collections.emptyList();
+        List<Recommendation> userRecs = useUserCF ? userBasedCF.recommend(trainMatrix, userId, poolSize) : Collections.emptyList();
+
+        Map<Long, Double> itemRankScore = rankScoreMap(itemRecs);
+        Map<Long, Double> userRankScore = rankScoreMap(userRecs);
+        Map<Long, Double> popScore = usePopularity ? popularityScoreMap(trainMatrix, poolSize, rated) : Map.of();
+        Map<Long, Double> associationScore = useAssociation ? associationScoreMap(trainMatrix, userId, poolSize) : Map.of();
+
+        Set<Long> candidates = new HashSet<>();
+        candidates.addAll(itemRankScore.keySet());
+        candidates.addAll(userRankScore.keySet());
+        candidates.addAll(popScore.keySet());
+        candidates.addAll(associationScore.keySet());
+        candidates.removeAll(rated);
+
+        double itemCfWeight = 0.35;
+        double userCfWeight = 0.25;
+        double popWeight = 0.20;
+        double assocWeight = 0.20;
+
+        List<Recommendation> merged = new ArrayList<>();
+        for (Long itemId : candidates) {
+            double score = (useItemCF ? itemCfWeight * itemRankScore.getOrDefault(itemId, 0.0) : 0.0)
+                    + (useUserCF ? userCfWeight * userRankScore.getOrDefault(itemId, 0.0) : 0.0)
+                    + (usePopularity ? popWeight * popScore.getOrDefault(itemId, 0.0) : 0.0)
+                    + (useAssociation ? assocWeight * associationScore.getOrDefault(itemId, 0.0) : 0.0);
             if (score > 1e-12) {
                 merged.add(new Recommendation(itemId, score));
             }

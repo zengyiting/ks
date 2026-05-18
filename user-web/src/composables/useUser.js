@@ -1,26 +1,17 @@
-import { computed, ref, watch } from 'vue';
-import { apiPost } from '../api/client.js';
+import { computed, ref } from 'vue';
+import { apiPost, apiGet, saveTokens, clearTokens } from '../api/client.js';
 
 const STORAGE_KEY = 'authUser';
 
 const readStoredUser = () => {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.removeItem('userId');
-    return null;
-  }
+  if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
     if (parsed && Number.isFinite(parsed.id)) {
-      console.debug('[useUser] Loaded stored user:', parsed);
       return parsed;
     }
-    if (parsed && Number.isFinite(parsed.userId)) {
-      console.debug('[useUser] Converting old format userId to id:', parsed);
-      return { id: parsed.userId, username: parsed.username, phone: parsed.phone, email: parsed.email };
-    }
-  } catch (err) {
-    console.error('[useUser] Failed to parse stored user:', err);
+  } catch {
     localStorage.removeItem(STORAGE_KEY);
   }
   return null;
@@ -41,17 +32,33 @@ const isLoggedIn = computed(() => {
 
 const currentUser = computed(() => user.value);
 
+const hasValidToken = () => {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.accessToken) return false;
+    if (parsed.tokenExpiresAt && Date.now() > parsed.tokenExpiresAt) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const saveUser = (payload) => {
-  console.debug('[useUser] Saving user:', payload);
   const userData = {
     id: payload.id || payload.userId,
     username: payload.username,
     phone: payload.phone,
-    email: payload.email
+    email: payload.email,
+    accessToken: payload.accessToken,
+    refreshToken: payload.refreshToken,
+    tokenExpiresAt: payload.expiresIn ? Date.now() + payload.expiresIn * 1000 : undefined
   };
   user.value = userData;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-  console.debug('[useUser] User saved, isLoggedIn:', isLoggedIn.value, 'userId:', userId.value);
+  saveTokens(payload);
 };
 
 const loginWithPhone = async (phone, password) => {
@@ -59,7 +66,7 @@ const loginWithPhone = async (phone, password) => {
   if (!data || !data.userId) {
     throw new Error('登录失败：未返回用户信息');
   }
-  saveUser({ id: data.userId, username: data.username, phone: data.phone, email: data.email });
+  saveUser(data);
   return data;
 };
 
@@ -68,7 +75,7 @@ const loginWithEmail = async (email, password) => {
   if (!data || !data.userId) {
     throw new Error('登录失败：未返回用户信息');
   }
-  saveUser({ id: data.userId, username: data.username, phone: data.phone, email: data.email });
+  saveUser(data);
   return data;
 };
 
@@ -77,20 +84,109 @@ const loginWithUsername = async (username, password) => {
   if (!data || !data.userId) {
     throw new Error('登录失败：未返回用户信息');
   }
-  saveUser({ id: data.userId, username: data.username, phone: data.phone, email: data.email });
+  saveUser(data);
   return data;
 };
 
-const logout = () => {
-  console.debug('[useUser] Logging out');
-  user.value = null;
-  localStorage.removeItem(STORAGE_KEY);
+const loginWithSms = async (phone, code) => {
+  const data = await apiPost('/api/auth/login/sms', { phone, code });
+  if (!data || !data.userId) {
+    throw new Error('登录失败：未返回用户信息');
+  }
+  saveUser(data);
+  return data;
 };
 
-watch(user, (newVal) => {
-  console.debug('[useUser] User state changed:', newVal);
-}, { deep: true });
+const sendSmsCode = async (phone) => {
+  return apiPost('/api/auth/send-sms-code', { phone });
+};
+
+const sendEmailCode = async (email) => {
+  return apiPost('/api/auth/send-email-code', { email });
+};
+
+const registerByPhone = async (phone, username, password) => {
+  const data = await apiPost('/api/auth/register', { phone, username, password });
+  if (!data || !data.userId) {
+    throw new Error('注册失败：未返回用户信息');
+  }
+  saveUser(data);
+  return data;
+};
+
+const registerByEmail = async (email, code, username, password) => {
+  const data = await apiPost('/api/auth/register-email', { email, code, username, password });
+  if (!data || !data.userId) {
+    throw new Error('注册失败：未返回用户信息');
+  }
+  saveUser(data);
+  return data;
+};
+
+const refreshToken = async () => {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) throw new Error('无刷新令牌');
+  const parsed = JSON.parse(raw);
+  if (!parsed.refreshToken) throw new Error('无刷新令牌');
+  const data = await apiPost('/api/auth/refresh', { refreshToken: parsed.refreshToken });
+  saveUser(data);
+  return data;
+};
+
+const logout = async () => {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.accessToken) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${parsed.accessToken}` }
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+  user.value = null;
+  clearTokens();
+};
+
+const fetchCurrentUser = async () => {
+  if (!hasValidToken()) return null;
+  try {
+    const data = await apiGet('/api/auth/me');
+    if (data) {
+      user.value = {
+        ...user.value,
+        id: data.id,
+        username: data.username,
+        phone: data.phone,
+        email: data.email
+      };
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
 
 export function useUser() {
-  return { userId, currentUser, isLoggedIn, loginWithPhone, loginWithEmail, loginWithUsername, logout };
+  return {
+    userId,
+    currentUser,
+    isLoggedIn,
+    hasValidToken,
+    loginWithPhone,
+    loginWithEmail,
+    loginWithUsername,
+    loginWithSms,
+    sendSmsCode,
+    sendEmailCode,
+    registerByPhone,
+    registerByEmail,
+    refreshToken,
+    logout,
+    fetchCurrentUser
+  };
 }

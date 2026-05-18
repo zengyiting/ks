@@ -16,6 +16,23 @@ const status = ref('');
 const ratingValue = ref(0);
 const favoriteSet = ref(new Set());
 const cartSet = ref(new Set());
+const coverError = ref(false);
+
+const safeCoverImage = computed(() => {
+  if (!item.value) return '/images/placeholder.svg';
+  if (coverError.value) return '/images/placeholder.svg';
+  if (item.value.imageUrl) {
+    if (item.value.imageUrl.startsWith('/images/') || item.value.imageUrl.startsWith('http')) {
+      return item.value.imageUrl;
+    }
+    return `https://picsum.photos/seed/${item.value.id}/800/600`;
+  }
+  return `https://picsum.photos/seed/${item.value.id}/800/600`;
+});
+
+const handleCoverError = () => {
+  coverError.value = true;
+};
 
 const reasonText = computed(() => route.query.reason || '');
 
@@ -155,7 +172,7 @@ onMounted(() => {
   <div v-if="!item" class="empty-state">商品加载中...</div>
   <div v-else class="detail">
     <section class="detail-card">
-      <img class="detail-cover" :src="item.imageUrl || '/images/placeholder.svg'" :alt="item.name" />
+      <img class="detail-cover" :src="safeCoverImage" :alt="item.name" @error="handleCoverError" />
       <h2>{{ item.name }}</h2>
       <div class="detail-meta">
         <span class="meta-pill">分类 {{ item.category || '未分类' }}</span>

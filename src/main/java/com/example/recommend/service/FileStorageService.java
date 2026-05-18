@@ -17,6 +17,7 @@ import java.util.Set;
 @Service
 public class FileStorageService {
     private static final Set<String> ALLOWED_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg");
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
     private final Path uploadRoot;
 
@@ -27,6 +28,9 @@ public class FileStorageService {
     public StoredFile storeItemImage(Long itemId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file is required");
+        }
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件大小不能超过5MB");
         }
         String ext = fileExtension(file.getOriginalFilename());
         if (!ALLOWED_EXT.contains(ext)) {

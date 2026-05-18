@@ -4,16 +4,13 @@ import com.example.recommend.config.CacheService;
 import com.example.recommend.model.User;
 import com.example.recommend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -29,54 +26,45 @@ public class AuthService {
     private static final String REFRESH_TOKEN_PREFIX = "token:refresh:";
     private static final String USER_ID_PREFIX = "token:user:";
 
-    private static final int SMS_CODE_EXPIRE_SECONDS = 300; // 5分钟
-    private static final int EMAIL_CODE_EXPIRE_SECONDS = 300; // 5分钟
-    private static final int ACCESS_TOKEN_EXPIRE_SECONDS = 1800; // 30分钟
-    private static final int REFRESH_TOKEN_EXPIRE_SECONDS = 86400 * 7; // 7天
+    private static final int SMS_CODE_EXPIRE_SECONDS = 300;
+    private static final int EMAIL_CODE_EXPIRE_SECONDS = 300;
+    private static final int ACCESS_TOKEN_EXPIRE_SECONDS = 1800;
+    private static final int REFRESH_TOKEN_EXPIRE_SECONDS = 86400 * 7;
 
     private final UserRepository userRepository;
     private final CacheService cacheService;
     private final EmailService emailService;
     private final SecureRandom secureRandom;
+    private final BCryptPasswordEncoder passwordEncoder;
 
     public AuthService(UserRepository userRepository, CacheService cacheService, EmailService emailService) {
         this.userRepository = userRepository;
         this.cacheService = cacheService;
         this.emailService = emailService;
         this.secureRandom = new SecureRandom();
+        this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    /**
-     * 发送手机验证码
-     */
     public void sendSmsCode(String phone) {
         String safePhone = normalizePhone(phone);
         String code = generateCode();
         String key = SMS_CODE_PREFIX + safePhone;
 
-        // 模拟发送验证码（实际项目中调用短信服务商）
         System.out.println("【模拟发送短信验证码】手机号: " + safePhone + ", 验证码: " + code);
 
         cacheService.set(key, code, SMS_CODE_EXPIRE_SECONDS);
     }
 
-    /**
-     * 发送邮箱验证码
-     */
     public void sendEmailCode(String email) {
         String safeEmail = normalizeEmail(email);
         String code = generateCode();
         String key = EMAIL_CODE_PREFIX + safeEmail;
 
-        // 使用邮件服务发送验证码（支持真实发送或模拟发送）
         emailService.sendVerificationCode(safeEmail, code);
 
         cacheService.set(key, code, EMAIL_CODE_EXPIRE_SECONDS);
     }
 
-    /**
-     * 手机验证码登录
-     */
     @Transactional
     public TokenResponse loginBySms(String phone, String code) {
         String safePhone = normalizePhone(phone);
@@ -90,31 +78,24 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "验证码错误");
         }
 
-        // 删除已使用的验证码
         cacheService.delete(key);
 
-        // 查找或创建用户
         User user = findOrCreateUserByPhone(safePhone);
         return generateTokens(user);
     }
 
-    /**
-     * 手机密码登录
-     */
     @Transactional
     public TokenResponse loginByPhone(String phone, String password) {
         String safePhone = normalizePhone(phone);
         String safePassword = normalizePassword(password);
-        String hashed = hashPassword(safePassword);
 
         Optional<User> existing = userRepository.findByPhone(safePhone);
         if (existing.isEmpty()) {
-            // 如果用户不存在，自动创建（兼容旧逻辑）
             User user = new User(generateUsername());
             user.setPhone(safePhone);
-            user.setPasswordHash(hashed);
+            user.setPasswordHash(passwordEncoder.encode(safePassword));
             User saved = userRepository.save(user);
-            return new TokenResponse(null, null, null, saved.getId(), saved.getUsername(), saved.getPhone(), saved.getEmail());
+            return generateTokens(saved);
         }
 
         User user = existing.get();
@@ -124,27 +105,22 @@ public class AuthService {
 
         String stored = user.getPasswordHash();
         if (stored == null || stored.isBlank()) {
-            // 如果用户没有设置密码，设置密码
-            user.setPasswordHash(hashed);
+            user.setPasswordHash(passwordEncoder.encode(safePassword));
             userRepository.save(user);
             return generateTokens(user);
         }
 
-        if (!stored.equals(hashed)) {
+        if (!passwordEncoder.matches(safePassword, stored)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "手机号或密码错误");
         }
 
         return generateTokens(user);
     }
 
-    /**
-     * 邮箱密码登录
-     */
     @Transactional
     public TokenResponse loginByEmail(String email, String password) {
         String safeEmail = normalizeEmail(email);
         String safePassword = normalizePassword(password);
-        String hashed = hashPassword(safePassword);
 
         Optional<User> existing = userRepository.findByEmail(safeEmail);
         if (existing.isEmpty()) {
@@ -157,21 +133,17 @@ public class AuthService {
         }
 
         String stored = user.getPasswordHash();
-        if (stored == null || stored.isBlank() || !stored.equals(hashed)) {
+        if (stored == null || stored.isBlank() || !passwordEncoder.matches(safePassword, stored)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "邮箱或密码错误");
         }
 
         return generateTokens(user);
     }
 
-    /**
-     * 用户名密码登录
-     */
     @Transactional
     public TokenResponse loginByUsername(String username, String password) {
         String safeUsername = username == null ? "" : username.trim();
         String safePassword = normalizePassword(password);
-        String hashed = hashPassword(safePassword);
 
         if (safeUsername.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户名不能为空");
@@ -188,16 +160,13 @@ public class AuthService {
         }
 
         String stored = user.getPasswordHash();
-        if (stored == null || stored.isBlank() || !stored.equals(hashed)) {
+        if (stored == null || stored.isBlank() || !passwordEncoder.matches(safePassword, stored)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
         }
 
         return generateTokens(user);
     }
 
-    /**
-     * 刷新token
-     */
     public TokenResponse refreshToken(String refreshToken) {
         String userIdStr = cacheService.get(REFRESH_TOKEN_PREFIX + refreshToken);
         if (userIdStr == null) {
@@ -216,15 +185,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
         }
 
-        // 删除旧的refresh token
         cacheService.delete(REFRESH_TOKEN_PREFIX + refreshToken);
 
         return generateTokens(userOpt.get());
     }
 
-    /**
-     * 登出
-     */
     public void logout(String accessToken) {
         String userIdStr = cacheService.get(ACCESS_TOKEN_PREFIX + accessToken);
         if (userIdStr != null) {
@@ -237,15 +202,11 @@ public class AuthService {
         }
     }
 
-    /**
-     * 邮箱注册（带验证码）
-     */
     @Transactional
     public TokenResponse registerByEmail(String email, String code, String username, String password) {
         String safeEmail = normalizeEmail(email);
         String safePassword = normalizePassword(password);
 
-        // 验证验证码
         String key = EMAIL_CODE_PREFIX + safeEmail;
         String storedCode = cacheService.get(key);
         if (storedCode == null) {
@@ -255,68 +216,55 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "验证码错误");
         }
 
-        // 删除已使用的验证码
         cacheService.delete(key);
 
-        // 验证用户名
         String safeUsername = username == null ? "" : username.trim();
         if (safeUsername.length() < 3) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户名至少3个字符");
         }
 
-        // 检查邮箱是否已注册
         if (userRepository.findByEmail(safeEmail).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "该邮箱已被注册");
         }
 
-        // 检查用户名是否已存在
         if (userRepository.findByUsername(safeUsername).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "该用户名已被使用");
         }
 
         User user = new User(safeUsername);
         user.setEmail(safeEmail);
-        user.setPasswordHash(hashPassword(safePassword));
+        user.setPasswordHash(passwordEncoder.encode(safePassword));
         User saved = userRepository.save(user);
 
         return generateTokens(saved);
     }
 
-    /**
-     * 手机注册
-     */
     @Transactional
     public TokenResponse registerByPhone(String phone, String username, String password) {
         String safePhone = normalizePhone(phone);
         String safePassword = normalizePassword(password);
 
-        // 验证用户名
         String safeUsername = username == null ? "" : username.trim();
         if (safeUsername.length() < 3) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户名至少3个字符");
         }
 
-        // 检查手机号是否已注册
         if (userRepository.findByPhone(safePhone).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "该手机号已被注册");
         }
 
-        // 检查用户名是否已存在
         if (userRepository.findByUsername(safeUsername).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "该用户名已被使用");
         }
 
         User user = new User(safeUsername);
         user.setPhone(safePhone);
-        user.setPasswordHash(hashPassword(safePassword));
+        user.setPasswordHash(passwordEncoder.encode(safePassword));
         User saved = userRepository.save(user);
 
         return generateTokens(saved);
     }
 
-    /**
-     * 验证access token
-     */
     public Optional<User> validateToken(String accessToken) {
         String userIdStr = cacheService.get(ACCESS_TOKEN_PREFIX + accessToken);
         if (userIdStr == null) {
@@ -341,7 +289,6 @@ public class AuthService {
             return user;
         }
 
-        // 创建新用户
         User user = new User(generateUsername());
         user.setPhone(phone);
         return userRepository.save(user);
@@ -351,15 +298,12 @@ public class AuthService {
         String accessToken = generateToken();
         String refreshToken = generateToken();
 
-        // 存储access token
         cacheService.set(ACCESS_TOKEN_PREFIX + accessToken,
                 String.valueOf(user.getId()), ACCESS_TOKEN_EXPIRE_SECONDS);
 
-        // 存储refresh token
         cacheService.set(REFRESH_TOKEN_PREFIX + refreshToken,
                 String.valueOf(user.getId()), REFRESH_TOKEN_EXPIRE_SECONDS);
 
-        // 存储用户的refresh token（用于登出时清理）
         cacheService.set(USER_ID_PREFIX + user.getId(),
                 refreshToken, REFRESH_TOKEN_EXPIRE_SECONDS);
 
@@ -375,7 +319,7 @@ public class AuthService {
     }
 
     private String generateCode() {
-        int code = secureRandom.nextInt(900000) + 100000; // 100000-999999
+        int code = secureRandom.nextInt(900000) + 100000;
         return String.valueOf(code);
     }
 
@@ -413,19 +357,6 @@ public class AuthService {
         return safe;
     }
 
-    private String hashPassword(String password) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
-    }
-
-    /**
-     * 修改密码（需要旧密码）
-     */
     @Transactional
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         User user = userRepository.findById(userId)
@@ -443,17 +374,14 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前账号未设置密码，请先设置密码");
         }
 
-        if (!stored.equals(hashPassword(safeOldPassword))) {
+        if (!passwordEncoder.matches(safeOldPassword, stored)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "旧密码错误");
         }
 
-        user.setPasswordHash(hashPassword(safeNewPassword));
+        user.setPasswordHash(passwordEncoder.encode(safeNewPassword));
         userRepository.save(user);
     }
 
-    /**
-     * 通过验证码重置密码
-     */
     @Transactional
     public void resetPasswordBySms(String phone, String code, String newPassword) {
         String safePhone = normalizePhone(phone);
@@ -477,13 +405,10 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "用户已禁用");
         }
 
-        user.setPasswordHash(hashPassword(safeNewPassword));
+        user.setPasswordHash(passwordEncoder.encode(safeNewPassword));
         userRepository.save(user);
     }
 
-    /**
-     * 更新用户信息
-     */
     @Transactional
     public User updateUserInfo(Long userId, String username, String phone, String email) {
         User user = userRepository.findById(userId)
@@ -493,13 +418,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "用户已禁用");
         }
 
-        // 更新用户名（如果提供）
         if (username != null && !username.trim().isBlank()) {
             String safeUsername = username.trim();
             if (safeUsername.length() < 3) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户名至少3个字符");
             }
-            // 检查用户名是否被其他用户使用
             userRepository.findByUsername(safeUsername).ifPresent(existing -> {
                 if (!existing.getId().equals(userId)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "该用户名已被使用");
@@ -508,10 +431,8 @@ public class AuthService {
             user.setUsername(safeUsername);
         }
 
-        // 更新手机号（如果提供）
         if (phone != null && !phone.trim().isBlank()) {
             String safePhone = normalizePhone(phone);
-            // 检查手机号是否被其他用户使用
             userRepository.findByPhone(safePhone).ifPresent(existing -> {
                 if (!existing.getId().equals(userId)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "该手机号已被注册");
@@ -520,10 +441,8 @@ public class AuthService {
             user.setPhone(safePhone);
         }
 
-        // 更新邮箱（如果提供）
         if (email != null && !email.trim().isBlank()) {
             String safeEmail = normalizeEmail(email);
-            // 检查邮箱是否被其他用户使用
             userRepository.findByEmail(safeEmail).ifPresent(existing -> {
                 if (!existing.getId().equals(userId)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "该邮箱已被注册");
@@ -535,9 +454,6 @@ public class AuthService {
         return userRepository.save(user);
     }
 
-    /**
-     * 获取用户详情
-     */
     @Transactional(readOnly = true)
     public Optional<User> getUserById(Long userId) {
         return userRepository.findById(userId);

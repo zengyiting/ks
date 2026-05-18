@@ -5,15 +5,20 @@ import { useUser } from '../composables/useUser.js';
 
 const router = useRouter();
 const route = useRoute();
-const { loginWithPhone, loginWithEmail, loginWithUsername } = useUser();
+const { loginWithPhone, loginWithEmail, loginWithUsername, loginWithSms, sendSmsCode } = useUser();
 
-const loginType = ref('phone'); // 'phone', 'email', 'username'
+const loginType = ref('phone');
 const phone = ref('');
 const email = ref('');
 const username = ref('');
 const password = ref('');
+const smsCode = ref('');
 const status = ref('');
 const loading = ref(false);
+const sendingCode = ref(false);
+const codeCountdown = ref(0);
+
+let countdownTimer = null;
 
 const redirectTo = computed(() => {
   const target = route.query.redirect;
@@ -21,14 +26,46 @@ const redirectTo = computed(() => {
 });
 
 const canSubmit = computed(() => {
+  if (loginType.value === 'sms') {
+    return phone.value.trim().length >= 6 && smsCode.value.length === 6;
+  }
   if (loginType.value === 'phone') {
-    return phone.value.trim().length === 11 && password.value.length >= 6;
+    return phone.value.trim().length >= 6 && password.value.length >= 6;
   } else if (loginType.value === 'email') {
     return email.value.trim().includes('@') && password.value.length >= 6;
   } else {
     return username.value.trim().length >= 3 && password.value.length >= 6;
   }
 });
+
+const startCountdown = () => {
+  codeCountdown.value = 60;
+  countdownTimer = setInterval(() => {
+    codeCountdown.value--;
+    if (codeCountdown.value <= 0) {
+      clearInterval(countdownTimer);
+      codeCountdown.value = 0;
+    }
+  }, 1000);
+};
+
+const handleSendCode = async () => {
+  if (loginType.value === 'sms' && phone.value.trim().length < 6) {
+    status.value = '请输入正确的手机号';
+    return;
+  }
+  sendingCode.value = true;
+  status.value = '';
+  try {
+    await sendSmsCode(phone.value.trim());
+    status.value = '验证码已发送';
+    startCountdown();
+  } catch (err) {
+    status.value = err.message || '发送失败';
+  } finally {
+    sendingCode.value = false;
+  }
+};
 
 const submitLogin = async () => {
   if (!canSubmit.value) {
@@ -41,18 +78,20 @@ const submitLogin = async () => {
 
   try {
     let result;
-    if (loginType.value === 'phone') {
-      result = await loginWithPhone(phone.value, password.value);
+    if (loginType.value === 'sms') {
+      result = await loginWithSms(phone.value.trim(), smsCode.value);
+    } else if (loginType.value === 'phone') {
+      result = await loginWithPhone(phone.value.trim(), password.value);
     } else if (loginType.value === 'email') {
-      result = await loginWithEmail(email.value, password.value);
+      result = await loginWithEmail(email.value.trim(), password.value);
     } else {
-      result = await loginWithUsername(username.value, password.value);
+      result = await loginWithUsername(username.value.trim(), password.value);
     }
 
-    status.value = result.created ? '已为你自动注册并登录' : '登录成功';
+    status.value = '登录成功，正在跳转...';
     setTimeout(() => {
-      window.location.href = redirectTo.value;
-    }, 500);
+      router.push(redirectTo.value);
+    }, 400);
   } catch (err) {
     status.value = err.message || '登录失败';
   } finally {
@@ -71,21 +110,6 @@ const goToRegister = () => {
 
 <template>
   <div class="login-page">
-    <!-- 背景动画层 -->
-    <div class="animation-bg">
-      <!-- 流星 -->
-      <div class="shooting-star" v-for="i in 6" :key="i" :style="{ '--delay': `${i * 2.5}s`, '--top': `${15 + i * 12}%` }"></div>
-      <!-- 浮动光点 -->
-      <div class="float-light" v-for="i in 20" :key="'light-' + i" :style="{
-        '--delay': `${i * 0.3}s`,
-        '--left': `${Math.random() * 100}%`,
-        '--top': `${Math.random() * 100}%`
-      }"></div>
-      <!-- 光晕 -->
-      <div class="glow-circle glow-1"></div>
-      <div class="glow-circle glow-2"></div>
-    </div>
-
     <div class="login-container">
       <section class="login-hero">
         <div class="hero-content">
@@ -109,22 +133,26 @@ const goToRegister = () => {
           </div>
         </div>
 
-        <!-- 登录类型切换 -->
         <div class="login-tabs">
           <button
             class="tab-btn"
             :class="{ active: loginType === 'phone' }"
             @click="loginType = 'phone'"
           >
-            <span class="tab-icon">📱</span>
-            手机
+            手机密码
+          </button>
+          <button
+            class="tab-btn"
+            :class="{ active: loginType === 'sms' }"
+            @click="loginType = 'sms'"
+          >
+            验证码
           </button>
           <button
             class="tab-btn"
             :class="{ active: loginType === 'email' }"
             @click="loginType = 'email'"
           >
-            <span class="tab-icon">📧</span>
             邮箱
           </button>
           <button
@@ -132,19 +160,18 @@ const goToRegister = () => {
             :class="{ active: loginType === 'username' }"
             @click="loginType = 'username'"
           >
-            <span class="tab-icon">👤</span>
             用户名
           </button>
         </div>
 
         <form class="login-form" @submit.prevent="submitLogin">
-          <label class="field" v-if="loginType === 'phone'">
+          <label class="field" v-if="loginType !== 'email' && loginType !== 'username'">
             <span class="field-label">手机号</span>
             <input
               v-model="phone"
               class="text-input"
               type="tel"
-              placeholder="请输入11位手机号"
+              placeholder="请输入手机号"
               autocomplete="tel"
               inputmode="numeric"
             />
@@ -172,7 +199,29 @@ const goToRegister = () => {
             />
           </label>
 
-          <label class="field">
+          <label class="field" v-if="loginType === 'sms'">
+            <span class="field-label">验证码</span>
+            <div class="code-row">
+              <input
+                v-model="smsCode"
+                class="text-input code-input"
+                type="text"
+                placeholder="6位验证码"
+                inputmode="numeric"
+                maxlength="6"
+              />
+              <button
+                type="button"
+                class="btn-code"
+                :disabled="sendingCode || codeCountdown > 0"
+                @click="handleSendCode"
+              >
+                {{ codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
+              </button>
+            </div>
+          </label>
+
+          <label class="field" v-else>
             <span class="field-label">密码</span>
             <input
               v-model="password"
@@ -189,7 +238,8 @@ const goToRegister = () => {
           </button>
 
           <div class="login-hint">
-            <template v-if="loginType === 'phone'">若手机号未注册，将自动创建账号。</template>
+            <template v-if="loginType === 'sms'">验证码登录，未注册将自动创建账号。</template>
+            <template v-else-if="loginType === 'phone'">若手机号未注册，将自动创建账号。</template>
             <template v-else-if="loginType === 'email'">若邮箱未注册，将自动创建账号。</template>
             <template v-else>若用户名未注册，将自动创建账号。</template>
           </div>
@@ -218,83 +268,6 @@ const goToRegister = () => {
   justify-content: center;
   padding: 20px;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #1a1a2e 100%);
-}
-
-.animation-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-/* 流星动画 */
-.shooting-star {
-  position: absolute;
-  top: var(--top);
-  right: -100px;
-  width: 120px;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.9), transparent);
-  animation: shoot 5s var(--delay) infinite linear;
-}
-
-.shooting-star::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: white;
-  box-shadow: 0 0 15px 3px rgba(255,255,255,0.9);
-}
-
-@keyframes shoot {
-  0% { transform: translateX(0) translateY(0) rotate(-45deg); opacity: 0; }
-  15% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { transform: translateX(-130vw) translateY(130vh) rotate(-45deg); opacity: 0; }
-}
-
-/* 浮动光点 */
-.float-light {
-  position: absolute;
-  left: var(--left);
-  top: var(--top);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(139, 92, 246, 0.6);
-  animation: float 4s var(--delay) infinite ease-in-out;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 0.3; }
-  50% { transform: translateY(-30px) scale(1.5); opacity: 0.8; }
-}
-
-/* 光晕效果 */
-.glow-circle {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.3;
-}
-
-.glow-1 {
-  width: 500px;
-  height: 500px;
-  top: -150px;
-  right: -100px;
-  background: rgba(139, 92, 246, 0.6);
-}
-
-.glow-2 {
-  width: 400px;
-  height: 400px;
-  bottom: -100px;
-  left: -100px;
-  background: rgba(79, 124, 255, 0.5);
 }
 
 .login-container {
@@ -422,12 +395,12 @@ const goToRegister = () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 10px 8px;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -437,10 +410,6 @@ const goToRegister = () => {
   background: white;
   color: #4f7cff;
   box-shadow: 0 2px 8px rgba(79, 124, 255, 0.15);
-}
-
-.tab-icon {
-  font-size: 16px;
 }
 
 .login-form {
@@ -477,6 +446,39 @@ const goToRegister = () => {
   border-color: #4f7cff;
   background: white;
   box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.1);
+}
+
+.code-row {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input {
+  flex: 1;
+}
+
+.btn-code {
+  min-width: 110px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #4f7cff;
+  background: white;
+  color: #4f7cff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-code:hover:not(:disabled) {
+  background: #4f7cff;
+  color: white;
+}
+
+.btn-code:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-large {

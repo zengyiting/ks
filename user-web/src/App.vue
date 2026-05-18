@@ -1,5 +1,6 @@
 <script setup>
 import TopNav from './components/TopNav.vue';
+import Toast from './components/Toast.vue';
 </script>
 
 <template>
@@ -13,5 +14,6 @@ import TopNav from './components/TopNav.vue';
         <span>轻选集推荐实验室 · Spring Boot + Vue3</span>
       </footer>
     </div>
+    <Toast />
   </div>
 </template>

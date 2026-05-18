@@ -1,7 +1,9 @@
 package com.example.recommend.web;
 
+import com.example.recommend.config.AdminAuthInterceptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -11,9 +13,14 @@ import java.nio.file.Paths;
 @Configuration
 public class WebResourceConfig implements WebMvcConfigurer {
     private final String uploadDir;
+    private final AdminAuthInterceptor adminAuthInterceptor;
 
-    public WebResourceConfig(@Value("${recommend.upload-dir:uploads}") String uploadDir) {
+    public WebResourceConfig(
+            @Value("${recommend.upload-dir:uploads}") String uploadDir,
+            AdminAuthInterceptor adminAuthInterceptor
+    ) {
         this.uploadDir = uploadDir;
+        this.adminAuthInterceptor = adminAuthInterceptor;
     }
 
     @Override
@@ -22,5 +29,11 @@ public class WebResourceConfig implements WebMvcConfigurer {
         String location = root.toUri().toString();
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(location.endsWith("/") ? location : location + "/");
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/api/admin/**");
     }
 }

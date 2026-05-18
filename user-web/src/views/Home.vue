@@ -31,6 +31,22 @@ const recommendationVisibleCount = ref(RECOMMEND_INITIAL_BATCH);
 const exploreVisibleCount = ref(EXPLORE_INITIAL_BATCH);
 const recommendationScroller = ref(null);
 const exploreScroller = ref(null);
+const sidebarImageErrors = ref(new Set());
+
+const getSafeImage = (item) => {
+  if (sidebarImageErrors.value.has(item.id)) return '/images/placeholder.svg';
+  if (item.imageUrl) {
+    if (item.imageUrl.startsWith('/images/') || item.imageUrl.startsWith('http')) {
+      return item.imageUrl;
+    }
+    return `https://picsum.photos/seed/${item.id}/100/100`;
+  }
+  return `https://picsum.photos/seed/${item.id}/100/100`;
+};
+
+const handleSidebarImageError = (itemId) => {
+  sidebarImageErrors.value.add(itemId);
+};
 
 const maskPhone = (phone) => {
   if (!phone) return '';
@@ -381,7 +397,7 @@ onMounted(async () => {
               :key="item.id"
               class="panel-item"
             >
-              <img :src="item.imageUrl || '/images/placeholder.svg'" :alt="item.name" />
+              <img :src="getSafeImage(item)" :alt="item.name" @error="handleSidebarImageError(item.id)" />
               <div>
                 <div>{{ item.name }}</div>
                 <span>评分 {{ item.avgScore.toFixed(1) }}</span>
@@ -403,7 +419,7 @@ onMounted(async () => {
               :key="item.id"
               class="panel-item"
             >
-              <img :src="item.imageUrl || '/images/placeholder.svg'" :alt="item.name" />
+              <img :src="getSafeImage(item)" :alt="item.name" @error="handleSidebarImageError(item.id)" />
               <div>
                 <div>{{ item.name }}</div>
                 <span>人气 {{ item.ratingCount }}</span>

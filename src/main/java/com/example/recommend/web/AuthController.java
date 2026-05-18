@@ -2,6 +2,7 @@ package com.example.recommend.web;
 
 import com.example.recommend.model.User;
 import com.example.recommend.service.AuthService;
+import com.example.recommend.service.RateLimiterService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,38 +15,33 @@ import java.util.Optional;
 @RequestMapping("/api/auth")
 public class AuthController {
     private final AuthService authService;
+    private final RateLimiterService rateLimiter;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, RateLimiterService rateLimiter) {
         this.authService = authService;
+        this.rateLimiter = rateLimiter;
     }
 
-    /**
-     * 发送手机验证码
-     */
     @PostMapping("/send-sms-code")
     public ResponseEntity<Map<String, String>> sendSmsCode(@RequestBody SmsCodeRequest request) {
         if (request == null || request.phone() == null || request.phone().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手机号不能为空");
         }
+        rateLimiter.checkSmsRateLimit(request.phone());
         authService.sendSmsCode(request.phone());
         return ResponseEntity.ok(Map.of("message", "验证码已发送"));
     }
 
-    /**
-     * 发送邮箱验证码
-     */
     @PostMapping("/send-email-code")
     public ResponseEntity<Map<String, String>> sendEmailCode(@RequestBody EmailCodeRequest request) {
         if (request == null || request.email() == null || request.email().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "邮箱不能为空");
         }
+        rateLimiter.checkEmailRateLimit(request.email());
         authService.sendEmailCode(request.email());
         return ResponseEntity.ok(Map.of("success", "true", "message", "验证码已发送，请查收邮箱"));
     }
 
-    /**
-     * 手机号验证码登录
-     */
     @PostMapping("/login/sms")
     public AuthService.TokenResponse loginBySms(@RequestBody SmsLoginRequest request) {
         if (request == null) {
@@ -57,12 +53,10 @@ public class AuthController {
         if (request.code() == null || request.code().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码不能为空");
         }
+        rateLimiter.checkLoginRateLimit(request.phone());
         return authService.loginBySms(request.phone(), request.code());
     }
 
-    /**
-     * 手机号密码登录
-     */
     @PostMapping("/login")
     public AuthService.TokenResponse loginByPhone(@RequestBody PhonePasswordRequest request) {
         if (request == null) {
@@ -74,12 +68,10 @@ public class AuthController {
         if (request.password() == null || request.password().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码不能为空");
         }
+        rateLimiter.checkLoginRateLimit(request.phone());
         return authService.loginByPhone(request.phone(), request.password());
     }
 
-    /**
-     * 邮箱密码登录
-     */
     @PostMapping("/login-email")
     public AuthService.TokenResponse loginByEmail(@RequestBody EmailPasswordRequest request) {
         if (request == null) {
@@ -91,12 +83,10 @@ public class AuthController {
         if (request.password() == null || request.password().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码不能为空");
         }
+        rateLimiter.checkLoginRateLimit(request.email());
         return authService.loginByEmail(request.email(), request.password());
     }
 
-    /**
-     * 用户名密码登录
-     */
     @PostMapping("/login-username")
     public AuthService.TokenResponse loginByUsername(@RequestBody UsernamePasswordRequest request) {
         if (request == null) {
@@ -108,12 +98,10 @@ public class AuthController {
         if (request.password() == null || request.password().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码不能为空");
         }
+        rateLimiter.checkLoginRateLimit(request.username());
         return authService.loginByUsername(request.username(), request.password());
     }
 
-    /**
-     * 手机注册
-     */
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> registerByPhone(@RequestBody PhoneRegisterRequest request) {
         if (request == null) {
@@ -128,6 +116,7 @@ public class AuthController {
         if (request.password() == null || request.password().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码不能为空");
         }
+        rateLimiter.checkRegisterRateLimit(request.phone());
         AuthService.TokenResponse response = authService.registerByPhone(request.phone(), request.username(), request.password());
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -137,9 +126,6 @@ public class AuthController {
         ));
     }
 
-    /**
-     * 邮箱注册（带验证码）
-     */
     @PostMapping("/register-email")
     public ResponseEntity<Map<String, Object>> registerByEmail(@RequestBody EmailRegisterRequest request) {
         if (request == null) {
@@ -157,6 +143,7 @@ public class AuthController {
         if (request.password() == null || request.password().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码不能为空");
         }
+        rateLimiter.checkRegisterRateLimit(request.email());
         AuthService.TokenResponse response = authService.registerByEmail(request.email(), request.code(), request.username(), request.password());
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -166,9 +153,6 @@ public class AuthController {
         ));
     }
 
-    /**
-     * 刷新token
-     */
     @PostMapping("/refresh")
     public AuthService.TokenResponse refreshToken(@RequestBody RefreshTokenRequest request) {
         if (request == null || request.refreshToken() == null || request.refreshToken().isBlank()) {
@@ -177,9 +161,6 @@ public class AuthController {
         return authService.refreshToken(request.refreshToken());
     }
 
-    /**
-     * 登出
-     */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(@RequestHeader("Authorization") String authorization) {
         String accessToken = extractToken(authorization);
@@ -187,9 +168,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "登出成功"));
     }
 
-    /**
-     * 验证token
-     */
     @GetMapping("/validate")
     public ResponseEntity<UserInfoResponse> validateToken(@RequestHeader("Authorization") String authorization) {
         String accessToken = extractToken(authorization);
@@ -201,9 +179,6 @@ public class AuthController {
         return ResponseEntity.ok(new UserInfoResponse(user.getId(), user.getUsername(), user.getPhone(), user.getEmail(), user.isDisabled(), user.getCreatedAt()));
     }
 
-    /**
-     * 获取当前用户信息
-     */
     @GetMapping("/me")
     public ResponseEntity<UserInfoResponse> getCurrentUser(@RequestHeader("Authorization") String authorization) {
         String accessToken = extractToken(authorization);
@@ -215,9 +190,6 @@ public class AuthController {
         return ResponseEntity.ok(new UserInfoResponse(user.getId(), user.getUsername(), user.getPhone(), user.getEmail(), user.isDisabled(), user.getCreatedAt()));
     }
 
-    /**
-     * 更新用户信息
-     */
     @PutMapping("/me")
     public ResponseEntity<UserInfoResponse> updateUserInfo(
             @RequestHeader("Authorization") String authorization,
@@ -232,9 +204,6 @@ public class AuthController {
         return ResponseEntity.ok(new UserInfoResponse(updated.getId(), updated.getUsername(), updated.getPhone(), updated.getEmail(), updated.isDisabled(), updated.getCreatedAt()));
     }
 
-    /**
-     * 修改密码（需要旧密码）
-     */
     @PostMapping("/me/change-password")
     public ResponseEntity<Map<String, String>> changePassword(
             @RequestHeader("Authorization") String authorization,
@@ -254,9 +223,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "密码修改成功"));
     }
 
-    /**
-     * 通过短信验证码重置密码
-     */
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPasswordBySms(@RequestBody ResetPasswordRequest request) {
         if (request.phone() == null || request.phone().isBlank()) {
@@ -268,6 +234,7 @@ public class AuthController {
         if (request.newPassword() == null || request.newPassword().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新密码不能为空");
         }
+        rateLimiter.checkSmsRateLimit(request.phone());
         authService.resetPasswordBySms(request.phone(), request.code(), request.newPassword());
         return ResponseEntity.ok(Map.of("message", "密码重置成功"));
     }
@@ -279,7 +246,6 @@ public class AuthController {
         return authorization.substring(7);
     }
 
-    // 请求DTO
     public record SmsCodeRequest(String phone) {}
     public record EmailCodeRequest(String email) {}
     public record SmsLoginRequest(String phone, String code) {}
@@ -293,6 +259,5 @@ public class AuthController {
     public record ChangePasswordRequest(String oldPassword, String newPassword) {}
     public record ResetPasswordRequest(String phone, String code, String newPassword) {}
 
-    // 响应DTO
     public record UserInfoResponse(Long id, String username, String phone, String email, Boolean disabled, Object createdAt) {}
 }

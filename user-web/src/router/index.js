@@ -11,8 +11,8 @@ const routes = [
   { path: '/login', name: 'login', component: Login },
   { path: '/register', name: 'register', component: Register },
   { path: '/item/:id', name: 'item', component: ItemDetail },
-  { path: '/favorites', name: 'favorites', component: Favorites },
-  { path: '/cart', name: 'cart', component: Cart }
+  { path: '/favorites', name: 'favorites', component: Favorites, meta: { requiresAuth: true } },
+  { path: '/cart', name: 'cart', component: Cart, meta: { requiresAuth: true } }
 ];
 
 const router = createRouter({
@@ -20,6 +20,29 @@ const router = createRouter({
   routes,
   scrollBehavior() {
     return { top: 0 };
+  }
+});
+
+const isAuth = () => {
+  const raw = localStorage.getItem('authUser');
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.accessToken) return false;
+    if (parsed.tokenExpiresAt && Date.now() > parsed.tokenExpiresAt) return false;
+    return Number.isFinite(parsed.id) && parsed.id > 0;
+  } catch {
+    return false;
+  }
+};
+
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth && !isAuth()) {
+    next({ name: 'login', query: { redirect: to.fullPath } });
+  } else if ((to.name === 'login' || to.name === 'register') && isAuth()) {
+    next({ name: 'home' });
+  } else {
+    next();
   }
 });
 
