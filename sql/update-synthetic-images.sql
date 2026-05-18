@@ -7,3 +7,4 @@ UPDATE items SET image_url = 'https://images.unsplash.com/photo-1495446815901-a7
 UPDATE items SET image_url = 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?w=400&h=300&fit=crop' WHERE category = 'toy' AND image_url IS NULL;
 UPDATE items SET image_url = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=300&fit=crop' WHERE category = 'furniture' AND image_url IS NULL;
 UPDATE items SET image_url = 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?w=400&h=300&fit=crop' WHERE category = 'office' AND image_url IS NULL;
+UPDATE items SET image_url = 'https://image.tmdb.org/t/p/w500/rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg' WHERE category = 'movies' AND image_url IS NULL;

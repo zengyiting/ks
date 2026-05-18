@@ -75,7 +75,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码已过期，请重新获取");
         }
         if (!storedCode.equals(code)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "验证码错误");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码错误");
         }
 
         cacheService.delete(key);
@@ -111,7 +111,7 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(safePassword, stored)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "手机号或密码错误");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手机号或密码错误");
         }
 
         return generateTokens(user);
@@ -124,7 +124,7 @@ public class AuthService {
 
         Optional<User> existing = userRepository.findByEmail(safeEmail);
         if (existing.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "该邮箱未注册，请先注册");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "该邮箱未注册，请先注册");
         }
 
         User user = existing.get();
@@ -134,7 +134,7 @@ public class AuthService {
 
         String stored = user.getPasswordHash();
         if (stored == null || stored.isBlank() || !passwordEncoder.matches(safePassword, stored)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "邮箱或密码错误");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "邮箱或密码错误");
         }
 
         return generateTokens(user);
@@ -151,7 +151,7 @@ public class AuthService {
 
         Optional<User> existing = userRepository.findByUsername(safeUsername);
         if (existing.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "该用户名未注册，请先注册");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "该用户名未注册，请先注册");
         }
 
         User user = existing.get();
@@ -161,7 +161,7 @@ public class AuthService {
 
         String stored = user.getPasswordHash();
         if (stored == null || stored.isBlank() || !passwordEncoder.matches(safePassword, stored)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户名或密码错误");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户名或密码错误");
         }
 
         return generateTokens(user);

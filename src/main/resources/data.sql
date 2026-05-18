@@ -7,12 +7,12 @@ INSERT INTO users (id, username) VALUES
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 INSERT INTO items (id, name, category, image_url) VALUES
-  (101, '《算法导论》', 'books', 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=300&fit=crop'),
-  (102, '《Java 编程思想》', 'books', 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=300&fit=crop'),
-  (103, '《机器学习》', 'books', 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop'),
-  (201, '机械键盘', 'electronics', 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=300&fit=crop'),
-  (202, '降噪耳机', 'electronics', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop'),
-  (203, '人体工学椅', 'furniture', 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400&h=300&fit=crop')
+  (101, '肖申克的救赎', 'movies', 'https://image.tmdb.org/t/p/w500/9cj1846f89Xz7k8n3g8hP7qQ8q.jpg'),
+  (102, '阿甘正传', 'movies', 'https://image.tmdb.org/t/p/w500/arw2vc3hEP1eIiLqCjz0x3VgqPj.jpg'),
+  (103, '黑客帝国', 'movies', 'https://image.tmdb.org/t/p/w500/f89U3ADr1oixB1sU7yKXr8a7XK.jpg'),
+  (201, '盗梦空间', 'movies', 'https://image.tmdb.org/t/p/w500/ljsZTbVsrQSqZgWeep2B1QiDKuh.jpg'),
+  (202, '星际穿越', 'movies', 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg'),
+  (203, '蝙蝠侠：黑暗骑士', 'movies', 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911BTUgMe1nNaD.jpg')
 ON DUPLICATE KEY UPDATE name = VALUES(name), category = VALUES(category), image_url = VALUES(image_url);
 
 -- 评分：0-5
