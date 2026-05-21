@@ -82,7 +82,7 @@ onMounted(() => {
     <div v-else-if="items.length === 0" class="empty-state">购物袋为空，去首页加购一些商品。</div>
     <div v-else class="feed-block">
       <div class="feed-scroll feed-scroll-cart">
-        <div class="card-grid">
+        <div class="card-grid card-grid-limited">
           <ItemCard
             v-for="(item, index) in items"
             :key="item.id"
@@ -104,27 +104,4 @@ onMounted(() => {
   </section>
 </template>
 
-<style scoped>
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 40px;
-  color: #6b7280;
-}
 
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #4f7cff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-</style>

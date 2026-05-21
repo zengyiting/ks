@@ -22,7 +22,7 @@ const canSubmit = computed(() => {
   const hasUsername = username.value.trim().length >= 3;
   const hasPassword = password.value.length >= 6;
   const passwordMatch = password.value === confirmPassword.value;
-  
+
   if (registerType.value === 'phone') {
     return hasUsername && phone.value.trim().length === 11 && hasPassword && passwordMatch;
   } else {
@@ -36,17 +36,17 @@ const canSendCode = computed(() => {
 
 const sendEmailCode = async () => {
   if (!canSendCode.value) return;
-  
+
   codeLoading.value = true;
   status.value = '';
-  
+
   try {
     const data = await fetch('/api/auth/send-email-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.value.trim() })
     }).then(res => res.json());
-    
+
     if (data.success) {
       status.value = '验证码已发送，请查收邮箱';
       codeCountdown.value = 60;
@@ -81,10 +81,10 @@ const submitRegister = async () => {
     }
     return;
   }
-  
+
   loading.value = true;
   status.value = '';
-  
+
   try {
     const endpoint = registerType.value === 'phone' ? '/api/auth/register' : '/api/auth/register-email';
     const data = await fetch(endpoint, {
@@ -98,7 +98,7 @@ const submitRegister = async () => {
         password: password.value
       })
     }).then(res => res.json());
-    
+
     if (data.success) {
       status.value = '注册成功，正在登录...';
       setTimeout(() => {
@@ -142,14 +142,15 @@ const switchRegisterType = (type) => {
   <div class="register-page">
     <!-- 背景动画层 -->
     <div class="animation-bg">
-      <!-- 流星 -->
-      <div class="shooting-star" v-for="i in 8" :key="i" :style="{ '--delay': `${i * 2}s`, '--top': `${10 + i * 10}%` }"></div>
-      <!-- 花瓣 -->
-      <div class="petal" v-for="i in 12" :key="'petal-' + i" :style="{ '--delay': `${i * 1.5}s`, '--left': `${5 + i * 8}%` }"></div>
-      <!-- 光晕 -->
-      <div class="glow-circle glow-1"></div>
-      <div class="glow-circle glow-2"></div>
-      <div class="glow-circle glow-3"></div>
+      <!-- 深空渐变层 -->
+      <div class="deep-space"></div>
+      <!-- 细小白色星星 -->
+      <div class="stars-layer stars-white"></div>
+      <!-- 金色星光 -->
+      <div class="stars-layer stars-gold"></div>
+      <!-- 柔和光晕 -->
+      <div class="soft-glow glow-top"></div>
+      <div class="soft-glow glow-bottom"></div>
     </div>
 
     <div class="register-container">
@@ -175,16 +176,16 @@ const switchRegisterType = (type) => {
 
         <!-- 注册类型切换 -->
         <div class="register-tabs">
-          <button 
-            class="tab-btn" 
+          <button
+            class="tab-btn"
             :class="{ active: registerType === 'phone' }"
             @click="switchRegisterType('phone')"
           >
             <span class="tab-icon">📱</span>
             手机注册
           </button>
-          <button 
-            class="tab-btn" 
+          <button
+            class="tab-btn"
             :class="{ active: registerType === 'email' }"
             @click="switchRegisterType('email')"
           >
@@ -228,7 +229,7 @@ const switchRegisterType = (type) => {
                 autocomplete="email"
               />
             </label>
-            
+
             <label class="field">
               <span class="field-label">验证码</span>
               <div class="code-input-wrapper">
@@ -240,9 +241,9 @@ const switchRegisterType = (type) => {
                   maxlength="6"
                   inputmode="numeric"
                 />
-                <button 
-                  class="code-btn" 
-                  type="button" 
+                <button
+                  class="code-btn"
+                  type="button"
                   @click="sendEmailCode"
                   :disabled="!canSendCode"
                 >
@@ -303,15 +304,7 @@ const switchRegisterType = (type) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
-  background-size: 400% 400%;
-  animation: gradientShift 15s ease infinite;
-}
-
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  background: #050510;
 }
 
 .animation-bg {
@@ -321,85 +314,132 @@ const switchRegisterType = (type) => {
   overflow: hidden;
 }
 
-/* 流星动画 */
-.shooting-star {
+/* 深空渐变层 */
+.deep-space {
   position: absolute;
-  top: var(--top);
-  right: -100px;
-  width: 100px;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.8), transparent);
-  animation: shoot 4s var(--delay) infinite linear;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(30, 40, 80, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(20, 30, 60, 0.3) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 50%, rgba(15, 25, 50, 0.5) 0%, transparent 60%),
+    linear-gradient(180deg,
+      #050510 0%,
+      #080a1a 20%,
+      #0a0e25 40%,
+      #080c20 60%,
+      #060815 80%,
+      #050510 100%
+    );
 }
 
-.shooting-star::before {
-  content: '';
+/* 星星层通用样式 */
+.stars-layer {
   position: absolute;
-  right: 0;
-  width: 6px;
-  height: 6px;
+  inset: 0;
+  animation: subtleTwinkle 6s ease-in-out infinite;
+  z-index: 2;
+}
+
+/* 细小白色星星 */
+.stars-white {
+  background-image:
+    radial-gradient(2px 2px at 15px 25px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 45px 65px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(2px 2px at 85px 35px, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 130px 100px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(2px 2px at 185px 70px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 245px 140px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(2px 2px at 310px 55px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 375px 185px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(2px 2px at 445px 95px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 520px 165px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(2px 2px at 595px 45px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 670px 200px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(2px 2px at 750px 125px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 830px 175px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(2px 2px at 915px 65px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 25px 150px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 95px 210px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 170px 260px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 250px 310px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px 2px at 335px 275px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 425px 330px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 520px 290px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 615px 345px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px 2px at 715px 305px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 820px 360px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 925px 320px, rgba(255,255,255,0.6), transparent),
+    /* 第二行星星 */
+    radial-gradient(1px 1px at 65px 180px, rgba(255,255,255,0.75), transparent),
+    radial-gradient(2px 2px at 150px 240px, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at 240px 190px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 340px 260px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 450px 210px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px 2px at 560px 280px, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 675px 230px, rgba(255,255,255,0.75), transparent),
+    radial-gradient(2px 2px at 790px 300px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 910px 250px, rgba(255,255,255,0.8), transparent);
+  background-size: 1000px 400px;
+  animation-delay: 0s;
+}
+
+/* 金色星光 */
+.stars-gold {
+  background-image:
+    radial-gradient(2px 2px at 60px 45px, rgba(255, 220, 150, 0.9), transparent),
+    radial-gradient(2px 2px at 150px 130px, rgba(255, 210, 130, 0.8), transparent),
+    radial-gradient(2px 2px at 270px 80px, rgba(255, 225, 160, 0.85), transparent),
+    radial-gradient(2px 2px at 395px 190px, rgba(255, 205, 120, 0.8), transparent),
+    radial-gradient(2px 2px at 535px 110px, rgba(255, 220, 150, 0.85), transparent),
+    radial-gradient(2px 2px at 680px 165px, rgba(255, 210, 130, 0.8), transparent),
+    radial-gradient(2px 2px at 825px 75px, rgba(255, 225, 160, 0.85), transparent),
+    radial-gradient(2px 2px at 965px 145px, rgba(255, 205, 120, 0.8), transparent),
+    radial-gradient(2px 2px at 105px 240px, rgba(255, 220, 150, 0.8), transparent),
+    radial-gradient(2px 2px at 240px 300px, rgba(255, 210, 130, 0.85), transparent),
+    radial-gradient(2px 2px at 400px 250px, rgba(255, 225, 160, 0.8), transparent),
+    radial-gradient(2px 2px at 565px 315px, rgba(255, 205, 120, 0.85), transparent),
+    radial-gradient(2px 2px at 735px 280px, rgba(255, 220, 150, 0.8), transparent),
+    radial-gradient(2px 2px at 900px 340px, rgba(255, 210, 130, 0.85), transparent),
+    /* 额外的金色星星 */
+    radial-gradient(2px 2px at 180px 60px, rgba(255, 230, 170, 0.8), transparent),
+    radial-gradient(2px 2px at 320px 150px, rgba(255, 215, 140, 0.75), transparent),
+    radial-gradient(2px 2px at 470px 85px, rgba(255, 225, 160, 0.8), transparent),
+    radial-gradient(2px 2px at 620px 200px, rgba(255, 210, 130, 0.75), transparent),
+    radial-gradient(2px 2px at 780px 110px, rgba(255, 220, 150, 0.8), transparent),
+    radial-gradient(2px 2px at 930px 190px, rgba(255, 215, 140, 0.75), transparent);
+  background-size: 1000px 400px;
+  animation-delay: 3s;
+}
+
+/* 微妙闪烁动画 */
+@keyframes subtleTwinkle {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* 柔和光晕 */
+.soft-glow {
+  position: absolute;
   border-radius: 50%;
-  background: white;
-  box-shadow: 0 0 10px 2px rgba(255,255,255,0.8);
+  filter: blur(120px);
+  opacity: 0.15;
 }
 
-@keyframes shoot {
-  0% { transform: translateX(0) translateY(0) rotate(-45deg); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateX(-120vw) translateY(120vh) rotate(-45deg); opacity: 0; }
-}
-
-/* 花瓣动画 */
-.petal {
-  position: absolute;
-  bottom: -50px;
-  left: var(--left);
-  width: 12px;
-  height: 12px;
-  background: rgba(255, 200, 220, 0.6);
-  border-radius: 50% 0 50% 50%;
-  animation: fall 8s var(--delay) infinite ease-in-out;
-}
-
-@keyframes fall {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  10% { opacity: 0.8; }
-  90% { opacity: 0.6; }
-  100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; }
-}
-
-/* 光晕效果 */
-.glow-circle {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-}
-
-.glow-1 {
-  width: 400px;
+.glow-top {
+  width: 600px;
   height: 400px;
   top: -100px;
-  right: -100px;
-  background: rgba(139, 92, 246, 0.5);
-}
-
-.glow-2 {
-  width: 300px;
-  height: 300px;
-  bottom: -50px;
-  left: -50px;
-  background: rgba(240, 147, 251, 0.4);
-}
-
-.glow-3 {
-  width: 250px;
-  height: 250px;
-  top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(79, 124, 255, 0.3);
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(60, 80, 130, 0.4) 0%, transparent 70%);
+}
+
+.glow-bottom {
+  width: 500px;
+  height: 350px;
+  bottom: -80px;
+  left: 30%;
+  background: radial-gradient(ellipse, rgba(50, 70, 110, 0.3) 0%, transparent 70%);
 }
 
 .register-container {
