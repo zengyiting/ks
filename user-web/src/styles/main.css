@@ -129,18 +129,18 @@ h4 {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 15px 24px;
-  border-radius: 0;
-  border: none;
+  padding: 15px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(20, 20, 20, 0.08);
   background: rgba(248, 252, 255, 0.95);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
   position: fixed;
-  top: 0;
-  left: 24px;
-  right: 24px;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
   max-width: 1320px;
-  margin: 0 auto;
   z-index: 100;
 }
 
