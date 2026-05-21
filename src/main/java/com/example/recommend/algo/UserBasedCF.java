@@ -40,6 +40,37 @@ public class UserBasedCF implements RecommenderStrategy {
                 .collect(Collectors.toList());
     }
 
+    public double predict(Map<Long, Map<Long, Double>> userItem, Long userId, Long itemId) {
+        if (userItem == null || userItem.isEmpty() || userId == null || itemId == null) {
+            return GLOBAL_MEAN;
+        }
+        Map<Long, Double> targetRatings = userItem.getOrDefault(userId, Collections.emptyMap());
+        if (targetRatings.isEmpty()) {
+            return GLOBAL_MEAN;
+        }
+        if (targetRatings.containsKey(itemId)) {
+            return targetRatings.get(itemId);
+        }
+        List<Neighbor> neighbors = findNeighbors(userItem, targetRatings, userId);
+        if (neighbors.isEmpty()) {
+            return GLOBAL_MEAN;
+        }
+        double targetMean = targetRatings.values().stream().mapToDouble(Double::doubleValue).average().orElse(GLOBAL_MEAN);
+        double num = 0.0;
+        double den = 0.0;
+        for (Neighbor neighbor : neighbors) {
+            if (neighbor.similarity <= 0) continue;
+            Double neighborRating = neighbor.ratings.get(itemId);
+            if (neighborRating == null) continue;
+            double neighborMean = neighbor.ratings.values().stream().mapToDouble(Double::doubleValue).average().orElse(GLOBAL_MEAN);
+            num += neighbor.similarity * (neighborRating - neighborMean);
+            den += Math.abs(neighbor.similarity);
+        }
+        if (den == 0) return targetMean;
+        double predicted = targetMean + num / den;
+        return Math.max(1.0, Math.min(5.0, predicted));
+    }
+
     private List<Neighbor> findNeighbors(Map<Long, Map<Long, Double>> userItem,
                                          Map<Long, Double> targetRatings,
                                          Long userId) {

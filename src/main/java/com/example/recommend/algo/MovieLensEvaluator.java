@@ -17,26 +17,39 @@ public class MovieLensEvaluator {
         System.out.println("Loading data from: " + dataPath);
         System.out.println("Sample ratio: " + (sampleRatio * 100) + "% (完整数据)");
 
-        Map<Long, Map<Long, Double>> matrix = loadRatings(dataPath, sampleRatio);
-        Map<Long, String> categoryMap = new HashMap<>();
+        Map<Long, List<TimestampedRating>> matrix = loadRatings(dataPath, sampleRatio);
 
         System.out.println("Loaded: " + matrix.size() + " users");
         System.out.println("Total items: " + countItems(matrix));
+        System.out.println("Split strategy: temporal (last " + (0.2 * 100) + "% as test per user)");
+        System.out.println("Min train items per user: 1");
 
         DatasetSplit split = splitDataset(matrix, 0.2, 4.0);
 
         System.out.println("\n=== Starting Evaluation ===");
         System.out.println("Train users: " + split.trainSize());
         System.out.println("Test users: " + split.testSize());
+        System.out.println("Evaluable users: " + split.evaluableUsers());
+
+        Map<Long, Set<Long>> itemUserSet = buildItemUserSet(split.trainMatrix());
+        Map<Long, Map<Long, Double>> itemUsersMap = buildItemUsersWithRatings(split.trainMatrix());
+        Map<Long, Double> globalPopularity = computeGlobalPopularity(split.trainMatrix());
+        Set<Long> allTrainItems = getAllTrainItems(split.trainMatrix());
+        Set<Long> evaluableItems = new HashSet<>(split.candidateItems());
+        evaluableItems.removeAll(allTrainItems);
+
+        System.out.println("Precomputed: itemUserSet (" + itemUserSet.size() + " items)");
+        System.out.println("Precomputed: globalPopularity (" + globalPopularity.size() + " items)");
+        System.out.println("Evaluable items (excl. train): " + evaluableItems.size());
 
         UserBasedCF userBasedCF = new UserBasedCF();
         ItemBasedCF itemBasedCF = new ItemBasedCF();
 
         List<EvaluationResult> results = new ArrayList<>();
-        results.add(evaluateAlgorithm("User-Based CF", AlgorithmType.USER_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
-        results.add(evaluateAlgorithm("Item-Based CF", AlgorithmType.ITEM_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
-        results.add(evaluateAlgorithm("Behavior-Based", AlgorithmType.BEHAVIOR_BASED, split, categoryMap, 10, userBasedCF, itemBasedCF));
-        results.add(evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, categoryMap, 10, userBasedCF, itemBasedCF));
+        results.add(evaluateAlgorithm("User-Based CF", AlgorithmType.USER_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, evaluableItems));
+        results.add(evaluateAlgorithm("Item-Based CF", AlgorithmType.ITEM_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, evaluableItems));
+        results.add(evaluateAlgorithm("Behavior-Based", AlgorithmType.BEHAVIOR_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, evaluableItems));
+        results.add(evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, evaluableItems));
 
         generateHtmlReport(results, "reports/offline-eval/movielens-evaluation-report.html");
         System.out.println("\nReport saved to: reports/offline-eval/movielens-evaluation-report.html");
@@ -46,10 +59,13 @@ public class MovieLensEvaluator {
             String name,
             AlgorithmType type,
             DatasetSplit split,
-            Map<Long, String> categoryMap,
             int topK,
             UserBasedCF userBasedCF,
-            ItemBasedCF itemBasedCF
+            ItemBasedCF itemBasedCF,
+            Map<Long, Set<Long>> itemUserSet,
+            Map<Long, Map<Long, Double>> itemUsersMap,
+            Map<Long, Double> globalPopularity,
+            Set<Long> evaluableItems
     ) {
         System.out.println("\nEvaluating: " + name);
         long start = System.currentTimeMillis();
@@ -57,19 +73,28 @@ public class MovieLensEvaluator {
         double precision = 0.0;
         double recall = 0.0;
         double ndcg = 0.0;
+        double squaredError = 0.0;
+        int ratingCount = 0;
         Set<Long> coveredItems = new HashSet<>();
         int users = 0;
+        int skippedNoTrain = 0;
 
-        for (Map.Entry<Long, Set<Long>> entry : split.testRelevant().entrySet()) {
+        for (Map.Entry<Long, Map<Long, Double>> entry : split.testRatings().entrySet()) {
             Long userId = entry.getKey();
-            Set<Long> relevant = new HashSet<>(entry.getValue());
-            if (relevant.isEmpty()) continue;
+            Map<Long, Double> testUserRatings = entry.getValue();
+            if (testUserRatings.isEmpty()) continue;
 
             Set<Long> trainItems = split.trainMatrix().getOrDefault(userId, Collections.emptyMap()).keySet();
+            if (trainItems.isEmpty()) {
+                skippedNoTrain++;
+                continue;
+            }
+
+            Set<Long> relevant = new HashSet<>(testUserRatings.keySet());
             relevant.removeAll(trainItems);
             if (relevant.isEmpty()) continue;
 
-            List<Recommendation> recs = recommend(type, split.trainMatrix(), userId, topK, categoryMap, userBasedCF, itemBasedCF);
+            List<Recommendation> recs = recommend(type, split.trainMatrix(), userId, topK, userBasedCF, itemBasedCF, itemUserSet, globalPopularity);
             List<Long> topItems = recs.stream().limit(topK).map(Recommendation::getItemId).collect(Collectors.toList());
             coveredItems.addAll(topItems);
 
@@ -81,9 +106,34 @@ public class MovieLensEvaluator {
             recall += ((double) hit) / relevant.size();
             ndcg += ndcgAtK(topItems, relevant, topK);
             users++;
+
+            for (Map.Entry<Long, Double> testEntry : testUserRatings.entrySet()) {
+                Long itemId = testEntry.getKey();
+                double actual = testEntry.getValue();
+                double predicted;
+                switch (type) {
+                    case USER_BASED:
+                        predicted = userBasedCF.predict(split.trainMatrix(), userId, itemId);
+                        break;
+                    case ITEM_BASED:
+                        predicted = itemBasedCF.predict(split.trainMatrix(), itemUsersMap, userId, itemId);
+                        break;
+                    case BEHAVIOR_BASED:
+                    case HYBRID:
+                        double userAvg = split.trainMatrix().getOrDefault(userId, Collections.emptyMap())
+                                .values().stream().mapToDouble(Double::doubleValue).average().orElse(3.5);
+                        predicted = userAvg;
+                        break;
+                    default:
+                        predicted = 3.5;
+                }
+                squaredError += Math.pow(predicted - actual, 2);
+                ratingCount++;
+            }
         }
 
-        double coverage = ((double) coveredItems.size()) / split.candidateItems().size();
+        double coverage = evaluableItems.isEmpty() ? 0.0 : ((double) coveredItems.size()) / evaluableItems.size();
+        double rmse = ratingCount == 0 ? Double.NaN : Math.sqrt(squaredError / ratingCount);
         long time = System.currentTimeMillis() - start;
 
         double avgPrecision = users == 0 ? 0.0 : precision / users;
@@ -93,11 +143,15 @@ public class MovieLensEvaluator {
         System.out.printf("  Precision@%d: %.4f\n", topK, avgPrecision);
         System.out.printf("  Recall@%d: %.4f\n", topK, avgRecall);
         System.out.printf("  NDCG@%d: %.4f\n", topK, avgNdcg);
+        System.out.printf("  RMSE: %.4f\n", rmse);
         System.out.printf("  Coverage: %.4f\n", coverage);
         System.out.printf("  Evaluated users: %d\n", users);
+        if (skippedNoTrain > 0) {
+            System.out.printf("  Skipped (no train data): %d\n", skippedNoTrain);
+        }
         System.out.printf("  Time: %d ms\n", time);
 
-        return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, coverage, users, time);
+        return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, rmse, coverage, users, time);
     }
 
     private static void generateHtmlReport(List<EvaluationResult> results, String filePath) throws IOException {
@@ -151,11 +205,12 @@ public class MovieLensEvaluator {
                     </div>
             """);
 
-        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 评估结果对比</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
+        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 评估结果对比</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>RMSE</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
 
         double maxPrecision = results.stream().mapToDouble(r -> r.precision).max().orElse(0);
         double maxRecall = results.stream().mapToDouble(r -> r.recall).max().orElse(0);
         double maxNdcg = results.stream().mapToDouble(r -> r.ndcg).max().orElse(0);
+        double minRmse = results.stream().mapToDouble(r -> r.rmse).filter(v -> !Double.isNaN(v)).min().orElse(Double.MAX_VALUE);
         double maxCoverage = results.stream().mapToDouble(r -> r.coverage).max().orElse(0);
 
         for (EvaluationResult r : results) {
@@ -165,6 +220,7 @@ public class MovieLensEvaluator {
             html.append(String.format("<td>%.4f</td>", r.precision));
             html.append(String.format("<td>%.4f</td>", r.recall));
             html.append(String.format("<td>%.4f</td>", r.ndcg));
+            html.append(String.format("<td>%.4f</td>", r.rmse));
             html.append(String.format("<td>%.4f</td>", r.coverage));
             html.append("<td>").append(r.users).append("</td>");
             html.append("<td>").append(r.time).append("</td>");
@@ -207,11 +263,14 @@ public class MovieLensEvaluator {
         Files.writeString(Paths.get(filePath), html.toString());
     }
 
+    private record TimestampedRating(long itemId, double score, long timestamp) {}
+
     private record EvaluationResult(
         String name,
         double precision,
         double recall,
         double ndcg,
+        double rmse,
         double coverage,
         int users,
         long time
@@ -223,30 +282,31 @@ public class MovieLensEvaluator {
             Map<Long, Map<Long, Double>> trainMatrix,
             Long userId,
             int topK,
-            Map<Long, String> categoryMap,
             UserBasedCF userBasedCF,
-            ItemBasedCF itemBasedCF
+            ItemBasedCF itemBasedCF,
+            Map<Long, Set<Long>> itemUserSet,
+            Map<Long, Double> globalPopularity
     ) {
         return switch (type) {
             case USER_BASED -> {
                 List<Recommendation> recs = userBasedCF.recommend(trainMatrix, userId, topK);
-                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK);
+                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK, globalPopularity);
             }
             case ITEM_BASED -> {
                 List<Recommendation> recs = itemBasedCF.recommend(trainMatrix, userId, topK);
-                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK);
+                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK, globalPopularity);
             }
             case BEHAVIOR_BASED -> {
-                List<Recommendation> recs = behaviorBasedRecommend(trainMatrix, userId, topK);
-                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK);
+                List<Recommendation> recs = behaviorBasedRecommend(trainMatrix, userId, topK, itemUserSet, globalPopularity);
+                yield mergeWithPopularFallback(recs, trainMatrix, userId, topK, globalPopularity);
             }
-            case HYBRID -> blendHybrid(trainMatrix, userId, topK, categoryMap, userBasedCF, itemBasedCF);
+            case HYBRID -> blendHybrid(trainMatrix, userId, topK, userBasedCF, itemBasedCF, itemUserSet, globalPopularity);
             default -> Collections.emptyList();
         };
     }
 
-    private static Map<Long, Map<Long, Double>> loadRatings(String path, double sampleRatio) throws IOException {
-        Map<Long, Map<Long, Double>> matrix = new HashMap<>();
+    private static Map<Long, List<TimestampedRating>> loadRatings(String path, double sampleRatio) throws IOException {
+        Map<Long, List<TimestampedRating>> matrix = new HashMap<>();
         Random random = new Random(42);
         Files.lines(Paths.get(path))
                 .forEach(line -> {
@@ -257,58 +317,68 @@ public class MovieLensEvaluator {
                     long userId = Long.parseLong(parts[0]);
                     long itemId = Long.parseLong(parts[1]);
                     double rating = Double.parseDouble(parts[2]);
-                    matrix.computeIfAbsent(userId, k -> new HashMap<>()).put(itemId, rating);
+                    long timestamp = Long.parseLong(parts[3]);
+                    matrix.computeIfAbsent(userId, k -> new ArrayList<>())
+                          .add(new TimestampedRating(itemId, rating, timestamp));
                 });
         return matrix;
     }
 
-    private static int countItems(Map<Long, Map<Long, Double>> matrix) {
+    private static int countItems(Map<Long, List<TimestampedRating>> matrix) {
         Set<Long> items = new HashSet<>();
-        for (Map<Long, Double> userRatings : matrix.values()) {
-            items.addAll(userRatings.keySet());
+        for (List<TimestampedRating> userRatings : matrix.values()) {
+            for (TimestampedRating r : userRatings) {
+                items.add(r.itemId());
+            }
         }
         return items.size();
     }
 
     private static DatasetSplit splitDataset(
-            Map<Long, Map<Long, Double>> matrix,
+            Map<Long, List<TimestampedRating>> matrix,
             double testRatio,
             double relevanceThreshold
     ) {
         Map<Long, Map<Long, Double>> trainMatrix = new HashMap<>();
-        Map<Long, Set<Long>> testRelevant = new HashMap<>();
+        Map<Long, Map<Long, Double>> testRatings = new HashMap<>();
         Set<Long> candidateItems = new HashSet<>();
-        Random random = new Random(42);
 
-        for (Map.Entry<Long, Map<Long, Double>> entry : matrix.entrySet()) {
+        for (Map.Entry<Long, List<TimestampedRating>> entry : matrix.entrySet()) {
             Long userId = entry.getKey();
-            Map<Long, Double> ratings = entry.getValue();
+            List<TimestampedRating> ratings = entry.getValue();
+
+            List<TimestampedRating> sortedRatings = new ArrayList<>(ratings);
+            sortedRatings.sort(Comparator.comparingLong(TimestampedRating::timestamp));
+
             Map<Long, Double> trainRatings = new HashMap<>();
-            Set<Long> testItems = new HashSet<>();
+            Map<Long, Double> testUserRatings = new HashMap<>();
 
-            for (Map.Entry<Long, Double> rating : ratings.entrySet()) {
-                long itemId = rating.getKey();
-                double score = rating.getValue();
-                candidateItems.add(itemId);
+            int total = sortedRatings.size();
+            int trainCount = Math.max(1, (int) Math.ceil(total * (1 - testRatio)));
+            trainCount = Math.min(trainCount, total - 1);
 
-                if (random.nextDouble() < testRatio) {
-                    if (score >= relevanceThreshold) {
-                        testItems.add(itemId);
-                    }
+            for (int i = 0; i < total; i++) {
+                TimestampedRating r = sortedRatings.get(i);
+                candidateItems.add(r.itemId());
+
+                if (i < trainCount) {
+                    trainRatings.put(r.itemId(), r.score());
                 } else {
-                    trainRatings.put(itemId, score);
+                    if (r.score() >= relevanceThreshold) {
+                        testUserRatings.put(r.itemId(), r.score());
+                    }
                 }
             }
 
             if (!trainRatings.isEmpty()) {
                 trainMatrix.put(userId, trainRatings);
             }
-            if (!testItems.isEmpty()) {
-                testRelevant.put(userId, testItems);
+            if (!testUserRatings.isEmpty()) {
+                testRatings.put(userId, testUserRatings);
             }
         }
 
-        return new DatasetSplit(trainMatrix, testRelevant, candidateItems, trainMatrix.size(), testRelevant.size());
+        return new DatasetSplit(trainMatrix, testRatings, candidateItems, trainMatrix.size(), testRatings.size());
     }
 
     private static double ndcgAtK(List<Long> topItems, Set<Long> relevant, int k) {
@@ -333,7 +403,8 @@ public class MovieLensEvaluator {
             List<Recommendation> primary,
             Map<Long, Map<Long, Double>> matrix,
             Long userId,
-            int topN
+            int topN,
+            Map<Long, Double> globalPopularity
     ) {
         Map<Long, Recommendation> merged = new LinkedHashMap<>();
         for (Recommendation r : primary) {
@@ -344,7 +415,7 @@ public class MovieLensEvaluator {
         }
         Set<Long> excluded = new HashSet<>(merged.keySet());
         excluded.addAll(matrix.getOrDefault(userId, Collections.emptyMap()).keySet());
-        for (Recommendation r : popularFallback(matrix, topN - merged.size(), excluded)) {
+        for (Recommendation r : popularFallback(globalPopularity, topN - merged.size(), excluded)) {
             merged.putIfAbsent(r.getItemId(), r);
             if (merged.size() >= topN) break;
         }
@@ -352,25 +423,15 @@ public class MovieLensEvaluator {
     }
 
     private static List<Recommendation> popularFallback(
-            Map<Long, Map<Long, Double>> matrix,
+            Map<Long, Double> globalPopularity,
             int need,
             Set<Long> excluded
     ) {
         if (need <= 0) return Collections.emptyList();
-        Map<Long, double[]> stats = new HashMap<>();
-        for (Map<Long, Double> userRatings : matrix.values()) {
-            for (Map.Entry<Long, Double> e : userRatings.entrySet()) {
-                double[] acc = stats.computeIfAbsent(e.getKey(), k -> new double[2]);
-                acc[0] += e.getValue();
-                acc[1] += 1;
-            }
-        }
         List<Recommendation> ranked = new ArrayList<>();
-        for (Map.Entry<Long, double[]> e : stats.entrySet()) {
+        for (Map.Entry<Long, Double> e : globalPopularity.entrySet()) {
             if (excluded.contains(e.getKey())) continue;
-            double avg = e.getValue()[0] / e.getValue()[1];
-            double score = avg * Math.log(1 + e.getValue()[1]);
-            ranked.add(new Recommendation(e.getKey(), score));
+            ranked.add(new Recommendation(e.getKey(), e.getValue()));
         }
         return ranked.stream().sorted().limit(need).collect(Collectors.toList());
     }
@@ -378,7 +439,9 @@ public class MovieLensEvaluator {
     private static List<Recommendation> behaviorBasedRecommend(
             Map<Long, Map<Long, Double>> trainMatrix,
             Long userId,
-            int topK
+            int topK,
+            Map<Long, Set<Long>> itemUserSet,
+            Map<Long, Double> globalPopularity
     ) {
         Map<Long, Double> userRatings = trainMatrix.getOrDefault(userId, Collections.emptyMap());
         if (userRatings.isEmpty()) {
@@ -386,19 +449,19 @@ public class MovieLensEvaluator {
         }
 
         Map<Long, Double> itemScores = new HashMap<>();
-        Map<Long, Set<Long>> itemUsers = buildItemUserSet(trainMatrix);
-        Map<Long, Double> itemPopularity = popularityScoreMap(trainMatrix, topK * 3, userRatings.keySet());
+
+        Map<Long, Double> normalizedPop = normalizePopularity(globalPopularity);
 
         for (Map.Entry<Long, Double> ratedEntry : userRatings.entrySet()) {
             Long ratedItem = ratedEntry.getKey();
             double rating = ratedEntry.getValue();
 
-            Set<Long> coUsers = itemUsers.getOrDefault(ratedItem, Collections.emptySet());
+            Set<Long> coUsers = itemUserSet.getOrDefault(ratedItem, Collections.emptySet());
             if (coUsers.isEmpty()) continue;
 
             double behaviorIntensity = 0.2 + 0.8 * (rating / 5.0);
 
-            for (Map.Entry<Long, Set<Long>> entry : itemUsers.entrySet()) {
+            for (Map.Entry<Long, Set<Long>> entry : itemUserSet.entrySet()) {
                 Long candidate = entry.getKey();
                 if (userRatings.containsKey(candidate)) continue;
 
@@ -410,7 +473,7 @@ public class MovieLensEvaluator {
 
                 if (coCount > 0) {
                     double similarity = (double) coCount / Math.sqrt(coUsers.size() * candidateUsers.size());
-                    double popScore = itemPopularity.getOrDefault(candidate, 0.0);
+                    double popScore = normalizedPop.getOrDefault(candidate, 0.0);
                     double finalScore = behaviorIntensity * similarity * (0.6 + 0.4 * popScore);
                     itemScores.merge(candidate, finalScore, Double::sum);
                 }
@@ -428,9 +491,10 @@ public class MovieLensEvaluator {
             Map<Long, Map<Long, Double>> trainMatrix,
             Long userId,
             int topN,
-            Map<Long, String> categoryMap,
             UserBasedCF userBasedCF,
-            ItemBasedCF itemBasedCF
+            ItemBasedCF itemBasedCF,
+            Map<Long, Set<Long>> itemUserSet,
+            Map<Long, Double> globalPopularity
     ) {
         Set<Long> rated = trainMatrix.getOrDefault(userId, Collections.emptyMap()).keySet();
         int poolSize = Math.max(topN * 5, 20);
@@ -440,8 +504,8 @@ public class MovieLensEvaluator {
 
         Map<Long, Double> itemRankScore = rankScoreMap(itemRecs);
         Map<Long, Double> userRankScore = rankScoreMap(userRecs);
-        Map<Long, Double> popScore = popularityScoreMap(trainMatrix, poolSize, rated);
-        Map<Long, Double> associationScore = associationScoreMap(trainMatrix, userId, poolSize);
+        Map<Long, Double> popScore = normalizePopularity(globalPopularity);
+        Map<Long, Double> associationScore = associationScoreMap(trainMatrix, userId, poolSize, itemUserSet);
 
         Set<Long> candidates = new HashSet<>();
         candidates.addAll(itemRankScore.keySet());
@@ -461,7 +525,7 @@ public class MovieLensEvaluator {
             }
         }
 
-        return mergeWithPopularFallback(merged.stream().sorted().collect(Collectors.toList()), trainMatrix, userId, topN);
+        return mergeWithPopularFallback(merged.stream().sorted().collect(Collectors.toList()), trainMatrix, userId, topN, globalPopularity);
     }
 
     private static Map<Long, Set<Long>> buildItemUserSet(Map<Long, Map<Long, Double>> matrix) {
@@ -475,6 +539,54 @@ public class MovieLensEvaluator {
         return itemUserMatrix;
     }
 
+    private static Map<Long, Map<Long, Double>> buildItemUsersWithRatings(Map<Long, Map<Long, Double>> matrix) {
+        Map<Long, Map<Long, Double>> itemUsers = new HashMap<>();
+        for (Map.Entry<Long, Map<Long, Double>> userEntry : matrix.entrySet()) {
+            Long userId = userEntry.getKey();
+            for (Map.Entry<Long, Double> ratingEntry : userEntry.getValue().entrySet()) {
+                itemUsers.computeIfAbsent(ratingEntry.getKey(), k -> new HashMap<>())
+                        .put(userId, ratingEntry.getValue());
+            }
+        }
+        return itemUsers;
+    }
+
+    private static Map<Long, Double> computeGlobalPopularity(Map<Long, Map<Long, Double>> matrix) {
+        Map<Long, double[]> stats = new HashMap<>();
+        for (Map<Long, Double> userRatings : matrix.values()) {
+            for (Map.Entry<Long, Double> e : userRatings.entrySet()) {
+                double[] acc = stats.computeIfAbsent(e.getKey(), k -> new double[2]);
+                acc[0] += e.getValue();
+                acc[1] += 1;
+            }
+        }
+        Map<Long, Double> popularity = new HashMap<>();
+        for (Map.Entry<Long, double[]> e : stats.entrySet()) {
+            double avg = e.getValue()[0] / e.getValue()[1];
+            double score = avg * Math.log(1 + e.getValue()[1]);
+            popularity.put(e.getKey(), score);
+        }
+        return popularity;
+    }
+
+    private static Map<Long, Double> normalizePopularity(Map<Long, Double> globalPopularity) {
+        if (globalPopularity.isEmpty()) return Map.of();
+        double max = globalPopularity.values().stream().mapToDouble(Double::doubleValue).max().orElse(1.0);
+        Map<Long, Double> normalized = new HashMap<>();
+        for (Map.Entry<Long, Double> e : globalPopularity.entrySet()) {
+            normalized.put(e.getKey(), e.getValue() / max);
+        }
+        return normalized;
+    }
+
+    private static Set<Long> getAllTrainItems(Map<Long, Map<Long, Double>> trainMatrix) {
+        Set<Long> allItems = new HashSet<>();
+        for (Map<Long, Double> userRatings : trainMatrix.values()) {
+            allItems.addAll(userRatings.keySet());
+        }
+        return allItems;
+    }
+
     private static Map<Long, Double> rankScoreMap(List<Recommendation> recs) {
         Map<Long, Double> map = new HashMap<>();
         for (int i = 0; i < recs.size(); i++) {
@@ -484,35 +596,20 @@ public class MovieLensEvaluator {
         return map;
     }
 
-    private static Map<Long, Double> popularityScoreMap(
-            Map<Long, Map<Long, Double>> matrix,
-            int limit,
-            Set<Long> excluded
-    ) {
-        List<Recommendation> popular = popularFallback(matrix, limit, excluded);
-        if (popular.isEmpty()) return Map.of();
-        double max = popular.stream().mapToDouble(Recommendation::getScore).max().orElse(1.0);
-        Map<Long, Double> map = new HashMap<>();
-        for (Recommendation r : popular) {
-            map.put(r.getItemId(), r.getScore() / max);
-        }
-        return map;
-    }
-
     private static Map<Long, Double> associationScoreMap(
             Map<Long, Map<Long, Double>> trainMatrix,
             Long userId,
-            int limit
+            int limit,
+            Map<Long, Set<Long>> itemUserSet
     ) {
         Map<Long, Double> userRatings = trainMatrix.getOrDefault(userId, Collections.emptyMap());
         if (userRatings.isEmpty()) return Map.of();
-        Map<Long, Set<Long>> itemUsers = buildItemUserSet(trainMatrix);
         Map<Long, Double> raw = new HashMap<>();
         for (Long ratedItem : userRatings.keySet()) {
-            Set<Long> usersI = itemUsers.getOrDefault(ratedItem, Collections.emptySet());
+            Set<Long> usersI = itemUserSet.getOrDefault(ratedItem, Collections.emptySet());
             if (usersI.isEmpty()) continue;
             double userWeight = Math.max(0.0, userRatings.getOrDefault(ratedItem, 0.0) / 5.0);
-            for (Map.Entry<Long, Set<Long>> entry : itemUsers.entrySet()) {
+            for (Map.Entry<Long, Set<Long>> entry : itemUserSet.entrySet()) {
                 Long candidate = entry.getKey();
                 if (userRatings.containsKey(candidate)) continue;
                 Set<Long> usersJ = entry.getValue();
@@ -544,13 +641,19 @@ public class MovieLensEvaluator {
 
     private record DatasetSplit(
             Map<Long, Map<Long, Double>> trainMatrix,
-            Map<Long, Set<Long>> testRelevant,
+            Map<Long, Map<Long, Double>> testRatings,
             Set<Long> candidateItems,
             int trainSize,
             int testSize
     ) {
         public int evaluableUsers() {
-            return testRelevant.size();
+            int count = 0;
+            for (Map.Entry<Long, Map<Long, Double>> entry : testRatings.entrySet()) {
+                if (trainMatrix.containsKey(entry.getKey())) {
+                    count++;
+                }
+            }
+            return count;
         }
     }
 }
