@@ -34,7 +34,6 @@ public class MovieLensEvaluator {
         Map<Long, Set<Long>> itemUserSet = buildItemUserSet(split.trainMatrix());
         Map<Long, Double> globalPopularity = computeGlobalPopularity(split.trainMatrix());
         Set<Long> allTrainItems = getAllTrainItems(split.trainMatrix());
-        Map<Long, Map<Long, Double>> itemUsersMap = buildItemUsersWithRatings(split.trainMatrix());
 
         System.out.println("Precomputed: itemUserSet (" + itemUserSet.size() + " items)");
         System.out.println("Precomputed: globalPopularity (" + globalPopularity.size() + " items)");
@@ -44,10 +43,10 @@ public class MovieLensEvaluator {
         ItemBasedCF itemBasedCF = new ItemBasedCF();
 
         List<EvaluationResult> results = new ArrayList<>();
-        results.add(evaluateAlgorithm("User-Based CF", AlgorithmType.USER_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, allTrainItems));
-        results.add(evaluateAlgorithm("Item-Based CF", AlgorithmType.ITEM_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, allTrainItems));
-        results.add(evaluateAlgorithm("Behavior-Based", AlgorithmType.BEHAVIOR_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, allTrainItems));
-        results.add(evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, 10, userBasedCF, itemBasedCF, itemUserSet, itemUsersMap, globalPopularity, allTrainItems));
+        results.add(evaluateAlgorithm("User-Based CF", AlgorithmType.USER_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, globalPopularity, allTrainItems));
+        results.add(evaluateAlgorithm("Item-Based CF", AlgorithmType.ITEM_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, globalPopularity, allTrainItems));
+        results.add(evaluateAlgorithm("Behavior-Based", AlgorithmType.BEHAVIOR_BASED, split, 10, userBasedCF, itemBasedCF, itemUserSet, globalPopularity, allTrainItems));
+        results.add(evaluateAlgorithm("Hybrid", AlgorithmType.HYBRID, split, 10, userBasedCF, itemBasedCF, itemUserSet, globalPopularity, allTrainItems));
 
         generateHtmlReport(results, "reports/offline-eval/movielens-evaluation-report.html");
         System.out.println("\nReport saved to: reports/offline-eval/movielens-evaluation-report.html");
@@ -61,7 +60,6 @@ public class MovieLensEvaluator {
             UserBasedCF userBasedCF,
             ItemBasedCF itemBasedCF,
             Map<Long, Set<Long>> itemUserSet,
-            Map<Long, Map<Long, Double>> itemUsersMap,
             Map<Long, Double> globalPopularity,
             Set<Long> allTrainItems
     ) {
@@ -71,12 +69,9 @@ public class MovieLensEvaluator {
         double precision = 0.0;
         double recall = 0.0;
         double ndcg = 0.0;
-        double squaredError = 0.0;
-        int ratingCount = 0;
         Set<Long> coveredItems = new HashSet<>();
         int users = 0;
         int skippedNoTrain = 0;
-        boolean supportsRatingPrediction = (type == AlgorithmType.USER_BASED || type == AlgorithmType.ITEM_BASED);
 
         for (Map.Entry<Long, Map<Long, Double>> entry : split.testRatings().entrySet()) {
             Long userId = entry.getKey();
@@ -105,25 +100,9 @@ public class MovieLensEvaluator {
             recall += ((double) hit) / relevant.size();
             ndcg += ndcgAtK(topItems, relevant, topK);
             users++;
-
-            if (supportsRatingPrediction) {
-                for (Map.Entry<Long, Double> testEntry : testUserRatings.entrySet()) {
-                    Long itemId = testEntry.getKey();
-                    double actual = testEntry.getValue();
-                    double predicted;
-                    if (type == AlgorithmType.USER_BASED) {
-                        predicted = userBasedCF.predict(split.trainMatrix(), userId, itemId);
-                    } else {
-                        predicted = itemBasedCF.predict(split.trainMatrix(), itemUsersMap, userId, itemId);
-                    }
-                    squaredError += Math.pow(predicted - actual, 2);
-                    ratingCount++;
-                }
-            }
         }
 
         double coverage = allTrainItems.isEmpty() ? 0.0 : ((double) coveredItems.size()) / allTrainItems.size();
-        double rmse = ratingCount == 0 ? Double.NaN : Math.sqrt(squaredError / ratingCount);
         long time = System.currentTimeMillis() - start;
 
         double avgPrecision = users == 0 ? 0.0 : precision / users;
@@ -133,11 +112,6 @@ public class MovieLensEvaluator {
         System.out.printf("  Precision@%d: %.4f\n", topK, avgPrecision);
         System.out.printf("  Recall@%d: %.4f\n", topK, avgRecall);
         System.out.printf("  NDCG@%d: %.4f\n", topK, avgNdcg);
-        if (!Double.isNaN(rmse)) {
-            System.out.printf("  RMSE: %.4f\n", rmse);
-        } else {
-            System.out.println("  RMSE: N/A (ranking-only algorithm)");
-        }
         System.out.printf("  Coverage: %.4f\n", coverage);
         System.out.printf("  Evaluated users: %d\n", users);
         if (skippedNoTrain > 0) {
@@ -145,7 +119,7 @@ public class MovieLensEvaluator {
         }
         System.out.printf("  Time: %d ms\n", time);
 
-        return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, rmse, coverage, users, time);
+        return new EvaluationResult(name, avgPrecision, avgRecall, avgNdcg, coverage, users, time);
     }
 
     private static void generateHtmlReport(List<EvaluationResult> results, String filePath) throws IOException {
@@ -199,23 +173,20 @@ public class MovieLensEvaluator {
                     </div>
             """);
 
-        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 评估结果对比</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>RMSE</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
+        html.append("<div class=\"card\"><h2 class=\"card-title\">📈 评估结果对比</h2><div class=\"table-container\"><table><thead><tr><th>算法名称</th><th>精确率@10</th><th>召回率@10</th><th>NDCG@10</th><th>覆盖率</th><th>评估用户数</th><th>耗时(ms)</th></tr></thead><tbody>");
 
         double maxPrecision = results.stream().mapToDouble(r -> r.precision).max().orElse(0);
         double maxRecall = results.stream().mapToDouble(r -> r.recall).max().orElse(0);
         double maxNdcg = results.stream().mapToDouble(r -> r.ndcg).max().orElse(0);
-        double minRmse = results.stream().mapToDouble(r -> r.rmse).filter(v -> !Double.isNaN(v)).min().orElse(Double.MAX_VALUE);
         double maxCoverage = results.stream().mapToDouble(r -> r.coverage).max().orElse(0);
 
         for (EvaluationResult r : results) {
-            boolean isBestPrecision = r.precision == maxPrecision;
-            boolean isBestRmse = !Double.isNaN(r.rmse) && r.rmse == minRmse;
-            html.append("<tr").append(isBestPrecision || isBestRmse ? " class=\"highlight\"" : "").append(">");
+            boolean isBest = r.precision == maxPrecision;
+            html.append("<tr").append(isBest ? " class=\"highlight\"" : "").append(">");
             html.append("<td><strong>").append(r.name).append("</strong></td>");
             html.append(String.format("<td>%.4f</td>", r.precision));
             html.append(String.format("<td>%.4f</td>", r.recall));
             html.append(String.format("<td>%.4f</td>", r.ndcg));
-            html.append("<td>").append(Double.isNaN(r.rmse) ? "N/A" : String.format("%.4f", r.rmse)).append("</td>");
             html.append(String.format("<td>%.4f</td>", r.coverage));
             html.append("<td>").append(r.users).append("</td>");
             html.append("<td>").append(r.time).append("</td>");
@@ -265,7 +236,6 @@ public class MovieLensEvaluator {
         double precision,
         double recall,
         double ndcg,
-        double rmse,
         double coverage,
         int users,
         long time
