@@ -51,48 +51,6 @@ public class ItemBasedCF implements RecommenderStrategy {
                 .collect(Collectors.toList());
     }
 
-    public double predict(Map<Long, Map<Long, Double>> userItem, Map<Long, Map<Long, Double>> itemUsers, Long userId, Long itemId) {
-        if (userItem == null || userItem.isEmpty() || userId == null || itemId == null) {
-            return GLOBAL_MEAN;
-        }
-        Map<Long, Double> targetRatings = userItem.getOrDefault(userId, Collections.emptyMap());
-        if (targetRatings.isEmpty()) {
-            return GLOBAL_MEAN;
-        }
-        if (targetRatings.containsKey(itemId)) {
-            return targetRatings.get(itemId);
-        }
-        if (itemUsers == null || itemUsers.isEmpty()) {
-            itemUsers = buildItemUsers(userItem);
-        }
-        int currentUserCount = userItem.size();
-        int currentItemCount = itemUsers.size();
-        if (!cacheBuilt || lastUserCount != currentUserCount || lastItemCount != currentItemCount) {
-            buildSimilarityCache(itemUsers);
-            lastUserCount = currentUserCount;
-            lastItemCount = currentItemCount;
-        }
-        Map<Long, Double> similarItems = similarityCache.getOrDefault(itemId, Collections.emptyMap());
-        if (similarItems.isEmpty()) {
-            return GLOBAL_MEAN;
-        }
-        double userAvgRating = targetRatings.values().stream().mapToDouble(Double::doubleValue).average().orElse(GLOBAL_MEAN);
-        double num = 0.0;
-        double den = 0.0;
-        for (Map.Entry<Long, Double> simEntry : similarItems.entrySet()) {
-            Long ratedItem = simEntry.getKey();
-            if (!targetRatings.containsKey(ratedItem)) continue;
-            double similarity = simEntry.getValue();
-            if (similarity < MIN_SIMILARITY) continue;
-            double weight = Math.abs(similarity);
-            num += weight * (targetRatings.get(ratedItem) - userAvgRating);
-            den += weight;
-        }
-        if (den == 0) return userAvgRating;
-        double predicted = userAvgRating + num / den;
-        return Math.max(1.0, Math.min(5.0, predicted));
-    }
-
     public List<Recommendation> recommend(Map<Long, Map<Long, Double>> userItem, Map<Long, Map<Long, Double>> itemUsers, Long userId, int topN) {
         if (userItem == null || userItem.isEmpty() || userId == null || topN <= 0) {
             return List.of();
