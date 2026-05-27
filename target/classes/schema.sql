@@ -1,21 +1,3 @@
--- 创建商品类别表
-CREATE TABLE IF NOT EXISTS categories (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    parent_id BIGINT,
-    level INT DEFAULT 1,
-    sort_order INT DEFAULT 0,
-    icon_url VARCHAR(255),
-    enabled BOOLEAN DEFAULT TRUE,
-    description VARCHAR(500),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_parent_id (parent_id),
-    INDEX idx_name (name),
-    INDEX idx_enabled (enabled),
-    FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- 创建商品表
 CREATE TABLE IF NOT EXISTS items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

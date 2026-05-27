@@ -207,66 +207,13 @@ public class AdminCrudController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
     }
 
-    /**
-     * 获取所有分类列表
-     *
-     * @return 分类名称列表
-     */
-    @GetMapping("/categories")
-    public List<String> listCategories() {
-        return adminCrudService.listAllCategories();
-    }
-
-    /**
-     * 根据分类查询商品列表
-     *
-     * @param category 分类名称
-     * @return 商品数据传输对象列表
-     */
-    @GetMapping("/categories/{category}/items")
-    public List<ItemDto> listItemsByCategory(@PathVariable String category) {
-        return adminCrudService.listItemsByCategory(category).stream()
-                .map(this::toItemDto)
-                .toList();
-    }
-
-    /**
-     * 获取分类统计信息
-     *
-     * @return 分类统计信息列表
-     */
-    @GetMapping("/categories/stats")
-    public List<CategoryStatsDto> listCategoryStats() {
-        return adminCrudService.listCategoryStats().stream()
-                .map(stats -> new CategoryStatsDto(stats.category(), stats.count()))
-                .toList();
-    }
-
-    /**
-     * 批量更新商品分类
-     *
-     * @param request 分类更新请求
-     * @return 更新结果
-     */
-    @PutMapping("/categories/batch-update")
-    public ResponseEntity<Map<String, Object>> updateItemsCategory(@RequestBody CategoryUpdateRequest request) {
-        int count = adminCrudService.updateItemsCategory(request.oldCategory(), request.newCategory());
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "分类更新成功",
-                "updatedCount", count
-        ));
-    }
-
     // 请求DTO
     public record UserUpsertRequest(String username) {}
     public record UserDisabledRequest(boolean disabled) {}
     public record ItemUpsertRequest(String name, String category, java.math.BigDecimal price, String description, String imageUrl) {}
     public record ItemDisabledRequest(boolean disabled) {}
-    public record CategoryUpdateRequest(String oldCategory, String newCategory) {}
 
     // 响应DTO
     public record UserDto(Long id, String username, boolean disabled, String createdAt) {}
     public record ItemDto(Long id, String name, String category, java.math.BigDecimal price, String description, String imageUrl, boolean disabled, String createdAt) {}
-    public record CategoryStatsDto(String category, long count) {}
 }
