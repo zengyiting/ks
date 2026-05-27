@@ -54,6 +54,7 @@ const toggleSearch = () => {
     <div class="nav-center">
       <nav class="nav-links">
         <RouterLink to="/">首页</RouterLink>
+        <RouterLink to="/ranking">排行榜</RouterLink>
         <RouterLink to="/search">搜索</RouterLink>
         <RouterLink to="/favorites">收藏</RouterLink>
         <RouterLink to="/cart">购物袋</RouterLink>

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -222,13 +223,19 @@ public class AdminCrudService {
      *
      * @param name 商品名称，不能为空
      * @param category 商品分类，可以为空
+     * @param price 商品价格，可以为空
+     * @param imageUrl 商品图片URL，可以为空
+     * @param description 商品描述，可以为空
      * @return 创建的商品对象
      * @throws ResponseStatusException 当商品名为空时抛出异常
      */
     @Transactional
-    public Item createItem(String name, String category) {
+    public Item createItem(String name, String category, BigDecimal price, String imageUrl, String description) {
         String safeName = normalize(name, "商品名不能为空");
         Item item = new Item(safeName, normalizeNullable(category));
+        item.setPrice(price);
+        item.setImageUrl(normalizeNullable(imageUrl));
+        item.setDescription(normalizeNullable(description));
         Item created = itemRepository.save(item);
         recommendationCacheService.invalidateAll();
         return created;
@@ -242,11 +249,13 @@ public class AdminCrudService {
      * @param id 商品ID，必须大于0
      * @param name 商品名称，不能为空
      * @param category 商品分类，可以为空
+     * @param price 商品价格，可以为空
+     * @param description 商品描述，可以为空
      * @return 更新后的商品对象
      * @throws ResponseStatusException 当ID非法或商品不存在时抛出异常
      */
     @Transactional
-    public Item updateItem(Long id, String name, String category) {
+    public Item updateItem(Long id, String name, String category, BigDecimal price, String description) {
         if (id == null || id <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "商品ID非法");
         }
@@ -255,6 +264,8 @@ public class AdminCrudService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
         item.setName(safeName);
         item.setCategory(normalizeNullable(category));
+        item.setPrice(price);
+        item.setDescription(normalizeNullable(description));
         Item updated = itemRepository.save(item);
         recommendationCacheService.invalidateAll();
         return updated;
@@ -268,6 +279,19 @@ public class AdminCrudService {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
         item.setImageUrl(normalizeNullable(imageUrl));
+        Item updated = itemRepository.save(item);
+        recommendationCacheService.invalidateAll();
+        return updated;
+    }
+
+    @Transactional
+    public Item updateItemDisabled(Long id, boolean disabled) {
+        if (id == null || id <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "商品ID非法");
+        }
+        Item item = itemRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "商品不存在"));
+        item.setDisabled(disabled);
         Item updated = itemRepository.save(item);
         recommendationCacheService.invalidateAll();
         return updated;

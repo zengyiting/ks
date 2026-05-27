@@ -55,6 +55,9 @@ public class BehaviorService {
     /** 推荐缓存管理服务，用于行为更新后淘汰用户推荐缓存 */
     private final RecommendationCacheService recommendationCacheService;
 
+    /** 收藏排行榜服务 */
+    private final RankingService rankingService;
+
     /**
      * 构造函数，注入依赖
      *
@@ -69,7 +72,8 @@ public class BehaviorService {
             RatingRepository ratingRepository,
             ItemAssociationPrecomputeService itemAssociationPrecomputeService,
             RecommendationCacheService recommendationCacheService,
-            UserItemFlagRepository userItemFlagRepository
+            UserItemFlagRepository userItemFlagRepository,
+            RankingService rankingService
     ) {
         this.userRepository = userRepository;
         this.itemRepository = itemRepository;
@@ -77,6 +81,7 @@ public class BehaviorService {
         this.itemAssociationPrecomputeService = itemAssociationPrecomputeService;
         this.recommendationCacheService = recommendationCacheService;
         this.userItemFlagRepository = userItemFlagRepository;
+        this.rankingService = rankingService;
     }
 
     /**
@@ -294,7 +299,11 @@ public class BehaviorService {
                 .findByUserIdAndItemId(userId, itemId)
                 .orElseGet(() -> new UserItemFlag(userId, itemId));
         if ("favorite".equals(action)) {
+            boolean wasFavorite = flag.isFavorite();
             flag.setFavorite(true);
+            if (!wasFavorite) {
+                rankingService.incrementFavorite(itemId);
+            }
         }
         if ("cart".equals(action)) {
             flag.setInCart(true);

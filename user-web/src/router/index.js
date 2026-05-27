@@ -7,6 +7,7 @@ import Login from '../views/Login.vue';
 import Register from '../views/Register.vue';
 import Search from '../views/Search.vue';
 import Profile from '../views/Profile.vue';
+import Ranking from '../views/Ranking.vue';
 
 const routes = [
   { path: '/', name: 'home', component: Home },
@@ -16,7 +17,8 @@ const routes = [
   { path: '/favorites', name: 'favorites', component: Favorites, meta: { requiresAuth: true } },
   { path: '/cart', name: 'cart', component: Cart, meta: { requiresAuth: true } },
   { path: '/search', name: 'search', component: Search },
-  { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true } }
+  { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true } },
+  { path: '/ranking', name: 'ranking', component: Ranking }
 ];
 
 const router = createRouter({
@@ -27,27 +29,56 @@ const router = createRouter({
   }
 });
 
-const isAuth = () => {
+const getStoredUser = () => {
   const raw = localStorage.getItem('authUser');
-  if (!raw) return false;
+  if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed.accessToken) return false;
-    if (parsed.tokenExpiresAt && Date.now() > parsed.tokenExpiresAt) return false;
-    return Number.isFinite(parsed.id) && parsed.id > 0;
+    if (!parsed.accessToken) return null;
+    if (parsed.tokenExpiresAt && Date.now() > parsed.tokenExpiresAt) return null;
+    if (!Number.isFinite(parsed.id) || parsed.id <= 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const validateToken = async () => {
+  const user = getStoredUser();
+  if (!user) return false;
+  
+  try {
+    const resp = await fetch('/api/users/me', {
+      headers: { Authorization: `Bearer ${user.accessToken}` }
+    });
+    if (!resp.ok) {
+      localStorage.removeItem('authUser');
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
 };
 
-router.beforeEach((to, from, next) => {
-  if (to.meta.requiresAuth && !isAuth()) {
-    next({ name: 'login', query: { redirect: to.fullPath } });
-  } else if ((to.name === 'login' || to.name === 'register') && isAuth()) {
+router.beforeEach(async (to, from, next) => {
+  if (to.meta.requiresAuth) {
+    const user = getStoredUser();
+    if (!user) {
+      next({ name: 'login', query: { redirect: to.fullPath } });
+      return;
+    }
+    
+    const isValid = await validateToken();
+    if (!isValid) {
+      next({ name: 'login', query: { redirect: to.fullPath } });
+      return;
+    }
+  } else if ((to.name === 'login' || to.name === 'register') && getStoredUser()) {
     next({ name: 'home' });
-  } else {
-    next();
+    return;
   }
+  next();
 });
 
 export default router;

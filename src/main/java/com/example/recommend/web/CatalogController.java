@@ -29,17 +29,20 @@ public class CatalogController {
     private final ItemRepository itemRepository;
     private final RatingRepository ratingRepository;
     private final UserItemFlagRepository userItemFlagRepository;
+    private final com.example.recommend.service.RankingService rankingService;
 
     public CatalogController(
             UserRepository userRepository,
             ItemRepository itemRepository,
             RatingRepository ratingRepository,
-            UserItemFlagRepository userItemFlagRepository
+            UserItemFlagRepository userItemFlagRepository,
+            com.example.recommend.service.RankingService rankingService
     ) {
         this.userRepository = userRepository;
         this.itemRepository = itemRepository;
         this.ratingRepository = ratingRepository;
         this.userItemFlagRepository = userItemFlagRepository;
+        this.rankingService = rankingService;
     }
 
     @GetMapping("/users")
@@ -81,6 +84,8 @@ public class CatalogController {
         RatingStat stat = ratingStats().get(item.getId());
         double avg = stat == null ? 0.0 : stat.avgScore();
         long count = stat == null ? 0L : stat.ratingCount();
+        double price = item.getPrice() == null ? 0.0 : item.getPrice().doubleValue();
+        String description = item.getDescription() == null ? "" : item.getDescription();
         return new ItemDetailDto(
                 item.getId(),
                 item.getName(),
@@ -88,7 +93,9 @@ public class CatalogController {
                 item.getImageUrl(),
                 avg,
                 count,
-                item.getCreatedAt() == null ? null : item.getCreatedAt().toString()
+                item.getCreatedAt() == null ? null : item.getCreatedAt().toString(),
+                price,
+                description
         );
     }
 
@@ -121,6 +128,7 @@ public class CatalogController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "收藏不存在"));
         flag.setFavorite(false);
         userItemFlagRepository.save(flag);
+        rankingService.decrementFavorite(itemId);
         return Map.of("success", true, "message", "已取消收藏");
     }
 
@@ -173,13 +181,14 @@ public class CatalogController {
     private ItemDto toItemDto(Item item, RatingStat stat) {
         double avg = stat == null ? 0.0 : stat.avgScore();
         long count = stat == null ? 0L : stat.ratingCount();
-        return new ItemDto(item.getId(), item.getName(), item.getCategory(), item.getImageUrl(), avg, count);
+        double price = item.getPrice() == null ? 0.0 : item.getPrice().doubleValue();
+        return new ItemDto(item.getId(), item.getName(), item.getCategory(), item.getImageUrl(), avg, count, price);
     }
 
     public record UserDto(Long id, String username) {
     }
 
-    public record ItemDto(Long id, String name, String category, String imageUrl, double avgScore, long ratingCount) {
+    public record ItemDto(Long id, String name, String category, String imageUrl, double avgScore, long ratingCount, double price) {
     }
 
     public record ItemDetailDto(
@@ -189,7 +198,9 @@ public class CatalogController {
             String imageUrl,
             double avgScore,
             long ratingCount,
-            String createdAt
+            String createdAt,
+            double price,
+            String description
     ) {
     }
 

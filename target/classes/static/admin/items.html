@@ -5,6 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>基于协同过滤的商品推荐系统 - 商品管理</title>
   <link rel="stylesheet" href="/admin/app.css"/>
+  <style>
+    .form-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .form-row label {
+      white-space: nowrap;
+    }
+    .form-row input, .form-row select {
+      margin: 0;
+    }
+    .inline-img {
+      width: 50px;
+      height: 50px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .toolbar-section {
+      background: var(--card-bg, #fff);
+      border: 1px solid var(--border, #e0e0e0);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .toolbar-section h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: var(--text-secondary, #666);
+    }
+  </style>
 </head>
 <body>
 <main class="page">
@@ -15,31 +48,68 @@
     </div>
     <nav class="nav">
       <a href="/admin/index.html">推荐管理</a>
+      <a href="/admin/categories.html">类别管理</a>
       <a href="/admin/behavior.html">行为采集</a>
       <a href="/admin/users.html">用户管理</a>
+      <button id="logoutBtn" class="ghost" type="button">退出登录</button>
       <button id="themeToggle" class="ghost" type="button">切换暗色</button>
     </nav>
   </header>
 
   <section class="card">
-    <h3>查询与新增</h3>
-    <div class="toolbar">
-      <label for="keyword">商品关键字</label>
-      <input id="keyword" placeholder="输入商品名后查询"/>
-      <button id="searchBtn" class="ghost">查询</button>
-      <label for="newName">新增商品名</label>
-      <input id="newName" placeholder="请输入商品名"/>
-      <label for="newCategory">类别</label>
-      <input id="newCategory" placeholder="例如 toy / books"/>
-      <button id="createBtn">新增商品</button>
-      <span id="msg" class="status"></span>
+    <h3>新增商品</h3>
+    <div class="toolbar-section">
+      <div class="form-row">
+        <label for="newName">商品名</label>
+        <input id="newName" placeholder="请输入商品名" style="width: 200px;"/>
+
+        <label for="newCategory">类别</label>
+        <input id="newCategory" placeholder="请输入商品类别" style="width: 140px;"/>
+
+        <label for="newPrice">价格</label>
+        <input id="newPrice" type="number" step="0.01" min="0" placeholder="0.00" style="width: 100px;"/>
+      </div>
+      <div class="form-row" style="margin-top: 12px;">
+        <label for="newDescription">商品描述</label>
+        <textarea id="newDescription" placeholder="请输入商品描述" style="width: 400px; height: 60px;"></textarea>
+
+        <label for="newImageFile">图片</label>
+        <input id="newImageFile" type="file" accept="image/*" style="width: 250px;"/>
+
+        <button id="createBtn">新增商品</button>
+        <span id="msg" class="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>商品查询</h3>
+    <div class="toolbar-section">
+      <div class="form-row">
+        <label for="keyword">商品关键字</label>
+        <input id="keyword" placeholder="输入商品名后查询" style="width: 200px;"/>
+        <button id="searchBtn" class="ghost">查询</button>
+        <button id="clearSearchBtn" class="ghost">重置</button>
+      </div>
     </div>
   </section>
 
   <section class="card">
     <h3>商品列表</h3>
     <table>
-      <thead><tr><th>ID</th><th>商品名</th><th>类别</th><th>图片</th><th>创建时间</th><th>操作</th></tr></thead>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>商品名</th>
+          <th>类别</th>
+          <th>价格</th>
+          <th>描述</th>
+          <th>图片</th>
+          <th>状态</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
       <tbody id="body"></tbody>
     </table>
     <div class="pager">
@@ -67,6 +137,7 @@
   let pageSize = 12;
   let rows = [];
   let page = 1;
+
   function initTheme() {
     const key = 'theme';
     const saved = localStorage.getItem(key) || 'light';
@@ -80,10 +151,15 @@
       $('themeToggle').textContent = next === 'dark' ? '切换亮色' : '切换暗色';
     });
   }
+
   function setMsg(text, cls) {
     $('msg').textContent = text || '';
     $('msg').className = 'status ' + (cls || '');
+    if (cls === 'ok') {
+      setTimeout(() => { $('msg').textContent = ''; }, 3000);
+    }
   }
+
   function renderItems() {
     const body = $('body');
     body.innerHTML = '';
@@ -91,30 +167,54 @@
     page = Math.max(1, Math.min(page, totalPages));
     const start = (page - 1) * pageSize;
     const pageRows = rows.slice(start, start + pageSize);
+
+    if (pageRows.length === 0) {
+      body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999;">暂无数据</td></tr>';
+      $('pagerInfo').textContent = '暂无数据';
+      return;
+    }
+
     pageRows.forEach(i => {
       const tr = document.createElement('tr');
       const imgUrl = i.imageUrl || '/images/placeholder.svg';
-      tr.innerHTML = `<td>${i.id}</td>
-                      <td><input data-name-id="${i.id}" value="${i.name || ''}"/></td>
-                      <td><input data-category-id="${i.id}" value="${i.category || ''}"/></td>
-                      <td>
-                        <div class="img-cell">
-                          <img src="${imgUrl}" alt="商品图"/>
-                          <input type="file" data-upload-id="${i.id}" accept="image/*"/>
-                        </div>
-                      </td>
-                      <td>${i.createdAt || ''}</td>
-                      <td class="actions">
-                        <button data-op="save" data-id="${i.id}">保存</button>
-                        <button data-op="del" data-id="${i.id}" class="ghost">删除</button>
-                      </td>`;
+      const description = (i.description || '').substring(0, 50) + ((i.description && i.description.length > 50) ? '...' : '');
+      const isDisabled = i.disabled === true;
+      const statusLabel = isDisabled ? '<span class="tag err">已下架</span>' : '<span class="tag ok">在售</span>';
+      const toggleLabel = isDisabled ? '上架' : '下架';
+
+      tr.innerHTML = `
+        <td>${i.id}</td>
+        <td><input data-name-id="${i.id}" value="${i.name || ''}" style="width:120px;"/></td>
+        <td>
+          <input data-category-id="${i.id}" value="${i.category || ''}" style="width:130px;"/>
+        </td>
+        <td>
+          <input data-price-id="${i.id}" type="number" step="0.01" min="0"
+                 value="${i.price || ''}" style="width:80px;"/>
+        </td>
+        <td title="${i.description || ''}" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${description}</td>
+        <td>
+          <div class="img-cell">
+            <img src="${imgUrl}" alt="商品图" class="inline-img"/>
+            <input type="file" data-upload-id="${i.id}" accept="image/*"/>
+          </div>
+        </td>
+        <td>${statusLabel}</td>
+        <td>${i.createdAt ? i.createdAt.split('T')[0] : ''}</td>
+        <td class="actions">
+          <button data-op="save" data-id="${i.id}">保存</button>
+          <button data-op="toggle" data-id="${i.id}" data-disabled="${isDisabled}">${toggleLabel}</button>
+          <button data-op="del" data-id="${i.id}" class="ghost">删除</button>
+        </td>`;
       body.appendChild(tr);
     });
-    $('pagerInfo').textContent = rows.length === 0 ? '暂无数据' : `第 ${page}/${totalPages} 页，共 ${rows.length} 条`;
+
+    $('pagerInfo').textContent = `第 ${page}/${totalPages} 页，共 ${rows.length} 条`;
     $('prevPage').disabled = page <= 1;
     $('nextPage').disabled = page >= totalPages;
     renderPageNumbers(totalPages);
   }
+
   function renderPageNumbers(totalPages) {
     const wrap = $('pageNumbers');
     wrap.innerHTML = '';
@@ -134,77 +234,165 @@
       wrap.appendChild(btn);
     }
   }
+
   async function loadItems() {
-    const keyword = encodeURIComponent($('keyword').value || '');
-    const resp = await fetch('/api/admin/items?keyword=' + keyword);
-    rows = await resp.json();
-    page = 1;
-    renderItems();
+    try {
+      const keyword = encodeURIComponent($('keyword').value || '');
+      const resp = await fetch('/api/admin/items?keyword=' + keyword);
+      if (!resp.ok) throw new Error('加载商品失败');
+      rows = await resp.json();
+      page = 1;
+      renderItems();
+    } catch (e) {
+      console.error('Load items error:', e);
+      setMsg('加载商品失败', 'err');
+    }
   }
+
   async function createItem() {
-    const name = $('newName').value;
-    const category = $('newCategory').value;
-    const resp = await fetch('/api/admin/items', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name, category})
-    });
-    if (!resp.ok) {
-      const err = await resp.json();
-      setMsg(err.message || '新增失败', 'err');
+    const name = $('newName').value.trim();
+    const category = $('newCategory').value.trim();
+    const price = $('newPrice').value.trim();
+    const description = $('newDescription').value.trim();
+    const file = $('newImageFile').files[0];
+
+    if (!name) {
+      setMsg('请输入商品名', 'err');
       return;
     }
-    $('newName').value = '';
-    $('newCategory').value = '';
-    setMsg('新增成功', 'ok');
-    await loadItems();
+
+    try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('category', category || '');
+      if (price) {
+        formData.append('price', price);
+      }
+      if (description) {
+        formData.append('description', description);
+      }
+      if (file) {
+        formData.append('file', file);
+      }
+
+      const resp = await fetch('/api/admin/items', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({message: '新增失败'}));
+        throw new Error(err.message || '新增失败');
+      }
+
+      $('newName').value = '';
+      $('newCategory').value = '';
+      $('newPrice').value = '';
+      $('newDescription').value = '';
+      $('newImageFile').value = '';
+      setMsg('新增成功', 'ok');
+      await loadItems();
+    } catch (e) {
+      setMsg(e.message || '新增失败', 'err');
+    }
   }
+
   async function saveItem(id) {
     const nameInput = document.querySelector(`input[data-name-id="${id}"]`);
     const categoryInput = document.querySelector(`input[data-category-id="${id}"]`);
-    const name = nameInput ? nameInput.value : '';
-    const category = categoryInput ? categoryInput.value : '';
-    const resp = await fetch('/api/admin/items/' + id, {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name, category})
-    });
-    if (!resp.ok) {
-      const err = await resp.json();
-      setMsg(err.message || '保存失败', 'err');
+    const priceInput = document.querySelector(`input[data-price-id="${id}"]`);
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const category = categoryInput ? categoryInput.value.trim() : '';
+    const price = priceInput ? parseFloat(priceInput.value) || 0 : 0;
+
+    if (!name) {
+      setMsg('商品名不能为空', 'err');
       return;
     }
-    setMsg('保存成功', 'ok');
-    await loadItems();
+
+    try {
+      const resp = await fetch('/api/admin/items/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, category, price})
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.message || '保存失败');
+      }
+
+      setMsg('保存成功', 'ok');
+      await loadItems();
+    } catch (e) {
+      setMsg(e.message || '保存失败', 'err');
+    }
   }
+
   async function deleteItem(id) {
-    const resp = await fetch('/api/admin/items/' + id, {method: 'DELETE'});
-    if (!resp.ok) {
-      const err = await resp.json();
-      setMsg(err.message || '删除失败', 'err');
-      return;
+    if (!confirm('确定要删除该商品吗？')) return;
+
+    try {
+      const resp = await fetch('/api/admin/items/' + id, {method: 'DELETE'});
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.message || '删除失败');
+      }
+      setMsg('删除成功', 'ok');
+      await loadItems();
+    } catch (e) {
+      setMsg(e.message || '删除失败', 'err');
     }
-    setMsg('删除成功', 'ok');
-    await loadItems();
   }
+
+  async function toggleItemDisabled(id, currentlyDisabled) {
+    try {
+      const resp = await fetch('/api/admin/items/' + id + '/disabled', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ disabled: !currentlyDisabled })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.message || '操作失败');
+      }
+
+      setMsg(currentlyDisabled ? '已上架' : '已下架', 'ok');
+      await loadItems();
+    } catch (e) {
+      setMsg(e.message || '操作失败', 'err');
+    }
+  }
+
   async function uploadItemImage(id, file) {
     if (!file) return;
     const data = new FormData();
     data.append('file', file);
-    const resp = await fetch('/api/admin/items/' + id + '/image', {
-      method: 'POST',
-      body: data
-    });
-    if (!resp.ok) {
-      const err = await resp.json();
-      setMsg(err.message || '上传失败', 'err');
-      return;
+    try {
+      const resp = await fetch('/api/admin/items/' + id + '/image', {
+        method: 'POST',
+        body: data
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.message || '上传失败');
+      }
+      setMsg('图片已更新', 'ok');
+      await loadItems();
+    } catch (e) {
+      setMsg(e.message || '上传失败', 'err');
     }
-    setMsg('图片已更新', 'ok');
-    await loadItems();
   }
+
   $('searchBtn').addEventListener('click', loadItems);
+  $('clearSearchBtn').addEventListener('click', () => {
+    $('keyword').value = '';
+    loadItems();
+  });
   $('createBtn').addEventListener('click', createItem);
+
   $('body').addEventListener('click', async (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
@@ -212,7 +400,12 @@
     const op = btn.getAttribute('data-op');
     if (op === 'save') await saveItem(id);
     if (op === 'del') await deleteItem(id);
+    if (op === 'toggle') {
+      const disabled = btn.getAttribute('data-disabled') === 'true';
+      await toggleItemDisabled(id, disabled);
+    }
   });
+
   $('body').addEventListener('change', async (e) => {
     const input = e.target.closest('input[type="file"][data-upload-id]');
     if (!input) return;
@@ -221,22 +414,51 @@
     await uploadItemImage(id, file);
     input.value = '';
   });
+
   $('prevPage').addEventListener('click', () => {
     page--;
     renderItems();
   });
+
   $('nextPage').addEventListener('click', () => {
     page++;
     renderItems();
   });
+
   $('pageSize').addEventListener('change', (e) => {
     pageSize = Number(e.target.value) || 12;
     page = 1;
     renderItems();
   });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    try {
+      await fetch('/api/admin/logout');
+    } catch (e) {}
+    window.location.href = '/admin/login.html';
+  });
+
+  $('keyword').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') loadItems();
+  });
+
   initTheme();
   renderItems();
-  loadItems();
+
+  // Check login status
+  (async () => {
+    try {
+      const resp = await fetch('/api/admin/status');
+      const data = await resp.json();
+      if (!data.authenticated) {
+        window.location.href = '/admin/login.html';
+        return;
+      }
+      loadItems();
+    } catch (e) {
+      window.location.href = '/admin/login.html';
+    }
+  })();
 </script>
 </body>
 </html>

@@ -178,6 +178,11 @@ onMounted(() => {
         <span class="meta-pill">分类 {{ item.category || '未分类' }}</span>
         <span class="meta-pill">评分 {{ item.avgScore.toFixed(1) }}</span>
         <span class="meta-pill">人气 {{ item.ratingCount }}</span>
+        <span v-if="item.price > 0" class="detail-price">¥{{ item.price.toFixed(2) }}</span>
+      </div>
+      <div v-if="item.description" class="detail-description">
+        <h4>商品描述</h4>
+        <p>{{ item.description }}</p>
       </div>
       <p v-if="reasonText" class="item-reason">推荐理由：{{ reasonText }}</p>
       <div class="detail-actions">
@@ -208,7 +213,7 @@ onMounted(() => {
           <ItemCard
             v-for="(rec, index) in related"
             :key="rec.itemId"
-            :item="{ id: rec.itemId, name: rec.name, category: rec.category, imageUrl: rec.imageUrl }"
+            :item="{ id: rec.itemId, name: rec.name, category: rec.category, imageUrl: rec.imageUrl, price: rec.price }"
             :reason="rec.reason"
             meta-label="匹配度"
             :meta-value="rec.score.toFixed(2)"

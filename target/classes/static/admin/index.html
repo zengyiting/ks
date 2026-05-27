@@ -14,9 +14,11 @@
       <p class="subtitle">输入用户ID、算法和 Top-N，实时查看推荐结果</p>
     </div>
     <nav class="nav">
+      <a href="/admin/categories.html">类别管理</a>
       <a href="/admin/behavior.html">行为采集</a>
       <a href="/admin/users.html">用户管理</a>
       <a href="/admin/items.html">商品管理</a>
+      <button id="logoutBtn" class="ghost" type="button">退出登录</button>
       <button id="themeToggle" class="ghost" type="button">切换暗色</button>
     </nav>
   </header>
@@ -160,8 +162,28 @@
     page = 1;
     render();
   });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    try { await fetch('/api/admin/logout'); } catch (e) {}
+    window.location.href = '/admin/login.html';
+  });
+
   initTheme();
-  render();
+
+  // Check login
+  (async () => {
+    try {
+      const resp = await fetch('/api/admin/status');
+      const data = await resp.json();
+      if (!data.authenticated) {
+        window.location.href = '/admin/login.html';
+        return;
+      }
+      render();
+    } catch (e) {
+      window.location.href = '/admin/login.html';
+    }
+  })();
 </script>
 </body>
 </html>

@@ -46,7 +46,8 @@ public class RecommendationController {
             String name = item == null ? "Item#" + r.itemId() : item.getName();
             String category = item == null ? null : item.getCategory();
             String imageUrl = item == null ? null : item.getImageUrl();
-            return new RecommendationDto(r.itemId(), name, category, imageUrl, r.score(), r.reason());
+            double price = item == null || item.getPrice() == null ? 0.0 : item.getPrice().doubleValue();
+            return new RecommendationDto(r.itemId(), name, category, imageUrl, r.score(), r.reason(), price);
         }).collect(Collectors.toList());
     }
 
@@ -78,7 +79,8 @@ public class RecommendationController {
             String name = item == null ? "Item#" + r.getItemId() : item.getName();
             String itemCategory = item == null ? null : item.getCategory();
             String imageUrl = item == null ? null : item.getImageUrl();
-            return new RecommendationDto(r.getItemId(), name, itemCategory, imageUrl, r.getScore(), "热门推荐");
+            double price = item == null || item.getPrice() == null ? 0.0 : item.getPrice().doubleValue();
+            return new RecommendationDto(r.getItemId(), name, itemCategory, imageUrl, r.getScore(), "热门推荐", price);
         }).collect(Collectors.toList());
     }
 
@@ -111,7 +113,8 @@ public class RecommendationController {
             String name = item == null ? "Item#" + r.itemId() : item.getName();
             String category = item == null ? null : item.getCategory();
             String imageUrl = item == null ? null : item.getImageUrl();
-            return new RecommendationDto(r.itemId(), name, category, imageUrl, r.score(), r.reason());
+            double price = item == null || item.getPrice() == null ? 0.0 : item.getPrice().doubleValue();
+            return new RecommendationDto(r.itemId(), name, category, imageUrl, r.score(), r.reason(), price);
         }).collect(Collectors.toList());
     }
 
@@ -139,5 +142,5 @@ public class RecommendationController {
     /**
      * 推荐返回 DTO
      */
-    public record RecommendationDto(Long itemId, String name, String category, String imageUrl, double score, String reason) {}
+    public record RecommendationDto(Long itemId, String name, String category, String imageUrl, double score, String reason, double price) {}
 }

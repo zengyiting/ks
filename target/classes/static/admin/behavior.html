@@ -15,8 +15,10 @@
     </div>
     <nav class="nav">
       <a href="/admin/index.html">推荐管理</a>
+      <a href="/admin/categories.html">类别管理</a>
       <a href="/admin/users.html">用户管理</a>
       <a href="/admin/items.html">商品管理</a>
+      <button id="logoutBtn" class="ghost" type="button">退出登录</button>
       <button id="themeToggle" class="ghost" type="button">切换暗色</button>
     </nav>
   </header>
@@ -252,9 +254,27 @@
     page = 1;
     renderRows();
   });
+  $('logoutBtn').addEventListener('click', async () => {
+    try { await fetch('/api/admin/logout'); } catch (e) {}
+    window.location.href = '/admin/login.html';
+  });
+
   initTheme();
-  renderRows();
-  loadUsers().then(loadItems);
+
+  (async () => {
+    try {
+      const resp = await fetch('/api/admin/status');
+      const data = await resp.json();
+      if (!data.authenticated) {
+        window.location.href = '/admin/login.html';
+        return;
+      }
+      renderRows();
+      loadUsers().then(loadItems);
+    } catch (e) {
+      window.location.href = '/admin/login.html';
+    }
+  })();
 </script>
 </body>
 </html>

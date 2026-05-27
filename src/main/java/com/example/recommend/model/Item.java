@@ -1,6 +1,7 @@
 package com.example.recommend.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
@@ -21,13 +22,25 @@ public class Item {
     @Column(nullable = false, length = 200)
     private String name;
 
-    /** 商品分类，可选字段，最大长度100字符 */
+    /** 商品分类名称（用于兼容旧数据和显示） */
     @Column(length = 100)
     private String category;
 
     /** 商品图片地址 */
     @Column(name = "image_url", length = 255)
     private String imageUrl;
+
+    /** 商品价格 */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal price;
+
+    /** 商品描述 */
+    @Column(name = "description", length = 2000)
+    private String description;
+
+    /** 商品是否下架，默认上架 */
+    @Column(name = "disabled")
+    private boolean disabled;
 
     /** 商品创建时间，默认为当前时间 */
     @Column(name = "created_at")
@@ -102,6 +115,30 @@ public class Item {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public boolean isDisabled() {
+        return disabled;
+    }
+
+    public void setDisabled(boolean disabled) {
+        this.disabled = disabled;
     }
 
     /**

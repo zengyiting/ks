@@ -94,32 +94,60 @@ public class AdminCrudController {
     }
 
     /**
-     * 创建新商品
+     * 创建新商品（支持文件上传）
      *
-     * @param request 商品创建请求，包含商品名称和分类
+     * @param name 商品名称
+     * @param category 商品分类
+     * @param price 商品价格
+     * @param description 商品描述
+     * @param file 商品图片文件（可选）
      * @return 创建后的商品数据传输对象
      */
-    @PostMapping("/items")
-    public ItemDto createItem(@RequestBody ItemUpsertRequest request) {
-        return toItemDto(adminCrudService.createItem(request.name(), request.category()));
+    @PostMapping(value = "/items", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ItemDto createItem(
+            @RequestParam("name") String name,
+            @RequestParam("category") String category,
+            @RequestParam(value = "price", required = false) java.math.BigDecimal price,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+
+        String imageUrl = null;
+        if (file != null && !file.isEmpty()) {
+            // 先创建商品获取ID，然后上传图片
+            Item tempItem = adminCrudService.createItem(name, category, price, null, description);
+            FileStorageService.StoredFile stored = fileStorageService.storeItemImage(tempItem.getId(), file);
+            return toItemDto(adminCrudService.updateItemImage(tempItem.getId(), stored.url()));
+        }
+
+        return toItemDto(adminCrudService.createItem(name, category, price, imageUrl, description));
     }
 
     /**
      * 更新指定商品的信息
      *
      * @param id 商品ID
-     * @param request 商品更新请求，包含新名称和分类
+     * @param request 商品更新请求，包含新名称、分类、价格和描述
      * @return 更新后的商品数据传输对象
      */
     @PutMapping("/items/{id}")
     public ItemDto updateItem(@PathVariable Long id, @RequestBody ItemUpsertRequest request) {
-        return toItemDto(adminCrudService.updateItem(id, request.name(), request.category()));
+        return toItemDto(adminCrudService.updateItem(
+                id,
+                request.name(),
+                request.category(),
+                request.price(),
+                request.description()));
     }
 
     @PostMapping(value = "/items/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ItemDto uploadItemImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         FileStorageService.StoredFile stored = fileStorageService.storeItemImage(id, file);
         return toItemDto(adminCrudService.updateItemImage(id, stored.url()));
+    }
+
+    @PutMapping("/items/{id}/disabled")
+    public ItemDto updateItemDisabled(@PathVariable Long id, @RequestBody ItemDisabledRequest request) {
+        return toItemDto(adminCrudService.updateItemDisabled(id, request.disabled()));
     }
 
     /**
@@ -158,7 +186,10 @@ public class AdminCrudController {
                 i.getId(),
                 i.getName(),
                 i.getCategory(),
+                i.getPrice(),
+                i.getDescription(),
                 i.getImageUrl(),
+                i.isDisabled(),
                 i.getCreatedAt() == null ? null : i.getCreatedAt().toString()
         );
     }
@@ -230,11 +261,12 @@ public class AdminCrudController {
     // 请求DTO
     public record UserUpsertRequest(String username) {}
     public record UserDisabledRequest(boolean disabled) {}
-    public record ItemUpsertRequest(String name, String category) {}
+    public record ItemUpsertRequest(String name, String category, java.math.BigDecimal price, String description, String imageUrl) {}
+    public record ItemDisabledRequest(boolean disabled) {}
     public record CategoryUpdateRequest(String oldCategory, String newCategory) {}
 
     // 响应DTO
     public record UserDto(Long id, String username, boolean disabled, String createdAt) {}
-    public record ItemDto(Long id, String name, String category, String imageUrl, String createdAt) {}
+    public record ItemDto(Long id, String name, String category, java.math.BigDecimal price, String description, String imageUrl, boolean disabled, String createdAt) {}
     public record CategoryStatsDto(String category, long count) {}
 }

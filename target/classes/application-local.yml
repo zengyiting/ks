@@ -19,26 +19,6 @@ spring:
       continue-on-error: true
       encoding: UTF-8
 
-  data:
-    redis:
-      host: ${REDIS_HOST:192.168.253.160}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASS:}
-      database: ${REDIS_DB:0}
-      timeout: ${REDIS_TIMEOUT:5000ms}
-      ssl:
-        enabled: ${REDIS_SSL:false}
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
-        shutdown-timeout: 100ms
-      connect-timeout: 2000ms
-      client-type: lettuce
-    redis.repositories.enabled: false
-
   servlet:
     multipart:
       max-file-size: 5MB

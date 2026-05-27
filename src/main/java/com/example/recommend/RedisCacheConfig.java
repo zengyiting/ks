@@ -1,17 +1,14 @@
 package com.example.recommend;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.example.recommend.service.AlgorithmType;
 import com.example.recommend.service.RecommendationCacheService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -26,27 +23,11 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 
 @Configuration
-public class RedisCacheConfig implements CachingConfigurer {
+public class RedisCacheConfig {
     private static final Logger log = LoggerFactory.getLogger(RedisCacheConfig.class);
-    private static final String RECOMMENDATION_CACHE = "recommendationResults";
 
-    /**
-     * 创建并配置Redis缓存管理器Bean
-     *
-     * <p>该方法创建一个基于Redis的缓存管理器，用于管理应用程序的缓存操作。
-     * 配置的默认缓存策略包括：
-     * <ul>
-     *   <li>缓存条目过期时间：10分钟</li>
-     *   <li>值序列化方式：使用GenericJackson2JsonRedisSerializer进行JSON序列化</li>
-     * </ul>
-     *
-     * @param connectionFactory Redis连接工厂，用于建立与Redis服务器的连接
-     * @return 配置好的RedisCacheManager实例，用于管理Redis缓存
-     */
     @Bean("cacheManager")
     @Primary
     @ConditionalOnBean(RedisConnectionFactory.class)
@@ -54,14 +35,8 @@ public class RedisCacheConfig implements CachingConfigurer {
         ObjectMapper cacheObjectMapper = new ObjectMapper();
         cacheObjectMapper.registerModule(new JavaTimeModule());
         cacheObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        cacheObjectMapper.activateDefaultTyping(
-            LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL,
-            JsonTypeInfo.As.PROPERTY
-        );
         GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer(cacheObjectMapper);
 
-        // 配置默认缓存策略：设置过期时间和序列化方式
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(10))
                 .disableCachingNullValues()
@@ -69,14 +44,8 @@ public class RedisCacheConfig implements CachingConfigurer {
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(valueSerializer));
 
-        Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put(RECOMMENDATION_CACHE, defaultConfig.entryTtl(Duration.ofMinutes(5)));
-
-        // 基于连接工厂和默认配置构建缓存管理器
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
-                .withInitialCacheConfigurations(cacheConfigs)
-                .transactionAware()
                 .build();
     }
 
@@ -90,7 +59,6 @@ public class RedisCacheConfig implements CachingConfigurer {
         };
     }
 
-    @Override
     @Bean
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {

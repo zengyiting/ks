@@ -1,4 +1,4 @@
-﻿-- MySQL 建表脚本：可直接执行
+-- MySQL 建表脚本：可直接执行
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   username VARCHAR(100) NOT NULL UNIQUE,
@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS items (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(200) NOT NULL,
   category VARCHAR(100),
+  price DECIMAL(10,2),
+  image_url VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -30,3 +32,8 @@ ALTER TABLE ratings ADD INDEX idx_r_rated_at (rated_at);
 ALTER TABLE ratings ADD INDEX idx_r_user_rated_at (user_id, rated_at);
 ALTER TABLE items ADD INDEX idx_items_name (name);
 ALTER TABLE items ADD INDEX idx_items_category (category);
+
+-- 添加新字段（如果不存在）
+ALTER TABLE items ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
+ALTER TABLE items ADD COLUMN IF NOT EXISTS image_url VARCHAR(255);
+ALTER TABLE items ADD COLUMN IF NOT EXISTS description VARCHAR(2000);

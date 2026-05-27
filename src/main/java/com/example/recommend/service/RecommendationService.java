@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -48,21 +49,28 @@ public class RecommendationService {
     /** 基于物品的协同过滤策略 */
     private final ItemBasedCF itemBasedCF = new ItemBasedCF();
 
+    /** 缓存管理服务 */
+    private final RecommendationCacheService cacheService;
+
     /**
      * 构造函数，注入依赖
      *
      * @param ratingRepository 评分仓库
      * @param itemRepository 商品仓库
      * @param itemAssociationPrecomputeService 商品关联预计算服务
+     * @param cacheService 缓存管理服务
      */
     public RecommendationService(
             RatingRepository ratingRepository,
             ItemRepository itemRepository,
-            ItemAssociationPrecomputeService itemAssociationPrecomputeService
+            ItemAssociationPrecomputeService itemAssociationPrecomputeService,
+            RecommendationCacheService cacheService
     ) {
         this.ratingRepository = ratingRepository;
         this.itemRepository = itemRepository;
         this.itemAssociationPrecomputeService = itemAssociationPrecomputeService;
+        this.cacheService = cacheService;
+        this.cacheService.invalidateAll();
     }
 
     /**
@@ -177,6 +185,14 @@ public class RecommendationService {
             case BEHAVIOR_BASED -> behaviorBasedRecommendations(context, matrix, decayMap, userId, topN);
             case HYBRID -> blendHybridRecommendations(context, matrix, decayMap, userId, topN);
         };
+        // 过滤掉无效的商品ID（可能是旧数据缓存导致的ID偏移）
+        Set<Long> validItemIds = new HashSet<>();
+        for (Map<Long, Double> userRatings : matrix.values()) {
+            validItemIds.addAll(userRatings.keySet());
+        }
+        primary = primary.stream()
+                .filter(r -> validItemIds.contains(r.getItemId()))
+                .collect(Collectors.toList());
         List<Recommendation> merged = mergeWithPopularFallback(context, primary, matrix, userId, topN);
         if (type != AlgorithmType.HYBRID || merged.isEmpty()) {
             return merged;
@@ -1030,13 +1046,13 @@ public class RecommendationService {
         }
         RecommendationContext context = new RecommendationContext();
         List<Recommendation> popular = popularFallback(context, topN * 2, new HashSet<>());
-        
+
         Map<Long, String> categoryMap = context.loadCategoryMap(
             popular.stream()
                 .map(Recommendation::getItemId)
                 .collect(java.util.stream.Collectors.toSet())
         );
-        
+
         return popular.stream()
                 .filter(rec -> category.equals(categoryMap.get(rec.getItemId())))
                 .limit(topN)
@@ -1059,34 +1075,34 @@ public class RecommendationService {
         if (userId == null || topN <= 0) {
             return List.of();
         }
-        
+
         RecommendationContext context = new RecommendationContext();
         AlgorithmType safeType = type == null ? AlgorithmType.USER_BASED : type;
-        
+
         // 获取初始推荐列表（取更多候选）
         int poolSize = Math.max(topN * 3, 50);
         List<Recommendation> initialRecs = recommendForUser(context, userId, poolSize, safeType);
-        
+
         if (initialRecs.isEmpty()) {
             return List.of();
         }
-        
+
         // 应用多样性优化
         Set<Long> itemIds = initialRecs.stream()
                 .map(Recommendation::getItemId)
                 .collect(java.util.stream.Collectors.toSet());
         Map<Long, String> categoryMap = context.loadCategoryMap(itemIds);
-        
+
         // 根据多样性级别调整lambda参数
         double lambda = 1.0 - diversityLevel * 0.4; // lambda: 0.6-1.0
         List<Recommendation> diversified = diversifyRecommendationsWithLambda(initialRecs, topN, categoryMap, lambda);
-        
+
         // 生成推荐理由
         Map<Long, Map<Long, Double>> matrix = context.userItemMatrix();
         Map<Long, Double> userRatings = matrix.getOrDefault(userId, Collections.emptyMap());
         Map<String, Double> pref = categoryPreferenceMap(userRatings, Collections.emptyMap(), categoryMap);
         String topCategory = pref.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
-        
+
         return diversified.stream()
                 .map(rec -> {
                     String reason = buildReason(safeType, rec.getItemId(), rec.getScore(), categoryMap, topCategory, 0.0, userRatings.keySet());

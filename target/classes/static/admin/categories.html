@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>基于协同过滤的商品推荐系统 - 类别管理</title>
+  <link rel="stylesheet" href="/admin/app.css"/>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <h1 class="title">类别管理</h1>
+      <p class="subtitle">支持商品类别的增删改查操作，支持多级分类</p>
+    </div>
+    <nav class="nav">
+      <a href="/admin/index.html">推荐管理</a>
+      <a href="/admin/behavior.html">行为采集</a>
+      <a href="/admin/users.html">用户管理</a>
+      <a href="/admin/items.html">商品管理</a>
+      <button id="logoutBtn" class="ghost" type="button">退出登录</button>
+      <button id="themeToggle" class="ghost" type="button">切换暗色</button>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h3>新增类别</h3>
+    <div class="toolbar">
+      <label for="newName">类别名称</label>
+      <input id="newName" placeholder="请输入类别名称"/>
+      <label for="parentCategory">上级类别</label>
+      <select id="parentCategory">
+        <option value="">顶级类别</option>
+      </select>
+      <label for="newSortOrder">排序号</label>
+      <input id="newSortOrder" type="number" value="0" min="0"/>
+      <button id="createBtn">新增类别</button>
+      <span id="msg" class="status"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>类别列表</h3>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>类别名称</th><th>层级</th><th>上级类别</th><th>排序号</th><th>状态</th><th>操作</th></tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h3>类别树形结构</h3>
+    <div id="treeView" class="tree-view"></div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let categories = [];
+  let parentOptions = [];
+
+  function initTheme() {
+    const key = 'theme';
+    const saved = localStorage.getItem(key) || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    $('themeToggle').textContent = saved === 'dark' ? '切换亮色' : '切换暗色';
+    $('themeToggle').addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem(key, next);
+      $('themeToggle').textContent = next === 'dark' ? '切换亮色' : '切换暗色';
+    });
+  }
+
+  function setMsg(text, cls) {
+    $('msg').textContent = text || '';
+    $('msg').className = 'status ' + (cls || '');
+  }
+
+  function renderCategories() {
+    const body = $('body');
+    body.innerHTML = '';
+
+    categories.forEach(cat => {
+      const parentName = parentOptions.find(p => p.id === cat.parentId)?.name || '-';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${cat.id}</td>
+        <td><input data-name-id="${cat.id}" value="${cat.name || ''}"/></td>
+        <td>L${cat.level}</td>
+        <td>${parentName}</td>
+        <td><input data-sort-id="${cat.id}" type="number" value="${cat.sortOrder || 0}"/></td>
+        <td>${cat.enabled ? '启用' : '禁用'}</td>
+        <td class="actions">
+          <button data-op="save" data-id="${cat.id}">保存</button>
+          <button data-op="toggle" data-id="${cat.id}">${cat.enabled ? '禁用' : '启用'}</button>
+          <button data-op="del" data-id="${cat.id}" class="ghost">删除</button>
+        </td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function renderParentOptions() {
+    const select = $('parentCategory');
+    select.innerHTML = '<option value="">顶级类别</option>';
+
+    parentOptions = categories.filter(c => c.enabled);
+    parentOptions.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat.id;
+      option.textContent = '└'.repeat(cat.level - 1) + ' ' + cat.name;
+      select.appendChild(option);
+    });
+  }
+
+  function renderTree() {
+    const treeView = $('treeView');
+    const topLevel = categories.filter(c => c.parentId === null && c.enabled);
+
+    function buildTree(items, level = 0) {
+      if (items.length === 0) return '';
+      let html = '<ul>';
+      items.forEach(item => {
+        const children = categories.filter(c => c.parentId === item.id && c.enabled);
+        const hasChildren = children.length > 0;
+        html += `
+          <li>
+            <div class="tree-item">
+              <span class="tree-indent">${'  '.repeat(level)}</span>
+              <span class="tree-icon">${hasChildren ? '▼' : '◉'}</span>
+              <span>${item.name}</span>
+              <span class="tree-badge">${item.id}</span>
+            </div>
+            ${hasChildren ? buildTree(children, level + 1) : ''}
+          </li>`;
+      });
+      html += '</ul>';
+      return html;
+    }
+
+    treeView.innerHTML = topLevel.length > 0 ? buildTree(topLevel) : '<p class="empty">暂无类别数据</p>';
+  }
+
+  async function loadCategories() {
+    const resp = await fetch('/api/admin/category');
+    categories = await resp.json();
+    renderCategories();
+    renderParentOptions();
+    renderTree();
+  }
+
+  async function createCategory() {
+    const name = $('newName').value.trim();
+    const parentId = $('parentCategory').value || null;
+    const sortOrder = Number($('newSortOrder').value) || 0;
+
+    if (!name) {
+      setMsg('请输入类别名称', 'err');
+      return;
+    }
+
+    const resp = await fetch('/api/admin/category', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, parentId, sortOrder, enabled: true})
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '新增失败', 'err');
+      return;
+    }
+
+    $('newName').value = '';
+    $('newSortOrder').value = '0';
+    $('parentCategory').value = '';
+    setMsg('新增成功', 'ok');
+    await loadCategories();
+  }
+
+  async function saveCategory(id) {
+    const nameInput = document.querySelector(`input[data-name-id="${id}"]`);
+    const sortInput = document.querySelector(`input[data-sort-id="${id}"]`);
+    const name = nameInput ? nameInput.value.trim() : '';
+    const sortOrder = Number(sortInput?.value) || 0;
+
+    if (!name) {
+      setMsg('请输入类别名称', 'err');
+      return;
+    }
+
+    const resp = await fetch('/api/admin/category/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, sortOrder})
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '保存失败', 'err');
+      return;
+    }
+
+    setMsg('保存成功', 'ok');
+    await loadCategories();
+  }
+
+  async function toggleCategory(id) {
+    const category = categories.find(c => c.id === id);
+    if (!category) return;
+
+    const resp = await fetch('/api/admin/category/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({enabled: !category.enabled})
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '操作失败', 'err');
+      return;
+    }
+
+    setMsg(category.enabled ? '已禁用' : '已启用', 'ok');
+    await loadCategories();
+  }
+
+  async function deleteCategory(id) {
+    if (!confirm('确定要删除该类别吗？删除后无法恢复。')) return;
+
+    const resp = await fetch('/api/admin/category/' + id, {method: 'DELETE'});
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      setMsg(err.message || '删除失败', 'err');
+      return;
+    }
+
+    setMsg('删除成功', 'ok');
+    await loadCategories();
+  }
+
+  $('createBtn').addEventListener('click', createCategory);
+
+  $('body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const id = Number(btn.getAttribute('data-id'));
+    const op = btn.getAttribute('data-op');
+
+    if (op === 'save') await saveCategory(id);
+    if (op === 'toggle') await toggleCategory(id);
+    if (op === 'del') await deleteCategory(id);
+  });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    try { await fetch('/api/admin/logout'); } catch (e) {}
+    window.location.href = '/admin/login.html';
+  });
+
+  initTheme();
+
+  (async () => {
+    try {
+      const resp = await fetch('/api/admin/status');
+      const data = await resp.json();
+      if (!data.authenticated) {
+        window.location.href = '/admin/login.html';
+        return;
+      }
+      loadCategories();
+    } catch (e) {
+      window.location.href = '/admin/login.html';
+    }
+  })();
+</script>
+</body>
+</html>

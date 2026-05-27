@@ -1,55 +1,37 @@
--- MySQL DDL (idempotent)
-CREATE TABLE IF NOT EXISTS users (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  username VARCHAR(100) NOT NULL UNIQUE,
-  phone VARCHAR(20) UNIQUE,
-  password_hash VARCHAR(64),
-  disabled TINYINT(1) NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- 创建商品类别表
+CREATE TABLE IF NOT EXISTS categories (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    parent_id BIGINT,
+    level INT DEFAULT 1,
+    sort_order INT DEFAULT 0,
+    icon_url VARCHAR(255),
+    enabled BOOLEAN DEFAULT TRUE,
+    description VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_parent_id (parent_id),
+    INDEX idx_name (name),
+    INDEX idx_enabled (enabled),
+    FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 创建商品表
 CREATE TABLE IF NOT EXISTS items (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(200) NOT NULL,
-  category VARCHAR(100),
-  image_url VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    category VARCHAR(100),
+    price DECIMAL(10,2),
+    image_url VARCHAR(255),
+    description VARCHAR(2000),
+    disabled BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_items_name (name),
+    INDEX idx_items_category (category),
+    INDEX idx_items_disabled (disabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS ratings (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id BIGINT NOT NULL,
-  item_id BIGINT NOT NULL,
-  score DOUBLE NOT NULL,
-  rated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_r_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_r_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
-  CONSTRAINT uk_user_item UNIQUE (user_id, item_id),
-  CONSTRAINT ck_score CHECK (score >= 0 AND score <= 5)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS user_item_flags (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id BIGINT NOT NULL,
-  item_id BIGINT NOT NULL,
-  favorite TINYINT(1) NOT NULL DEFAULT 0,
-  in_cart TINYINT(1) NOT NULL DEFAULT 0,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_flag_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_flag_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
-  CONSTRAINT uk_user_item_flag UNIQUE (user_id, item_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- Query indexes (repeatable with sql.init.continue-on-error=true)
-ALTER TABLE ratings ADD INDEX idx_r_item_id (item_id);
-ALTER TABLE ratings ADD INDEX idx_r_rated_at (rated_at);
-ALTER TABLE ratings ADD INDEX idx_r_user_rated_at (user_id, rated_at);
-ALTER TABLE items ADD INDEX idx_items_name (name);
-ALTER TABLE items ADD INDEX idx_items_category (category);
-ALTER TABLE user_item_flags ADD INDEX idx_flag_user (user_id);
-ALTER TABLE user_item_flags ADD INDEX idx_flag_item (item_id);
-
-ALTER TABLE items ADD COLUMN image_url VARCHAR(255);
-ALTER TABLE users ADD COLUMN disabled TINYINT(1) NOT NULL DEFAULT 0;
-ALTER TABLE users ADD COLUMN phone VARCHAR(20) UNIQUE;
-ALTER TABLE users ADD COLUMN password_hash VARCHAR(64);
+-- 兼容已存在的表：添加 disabled 列（如果尚不存在）
+-- 注意：此语句在表已存在时会报错，但 continue-on-error: true 会忽略
+ALTER TABLE items ADD COLUMN disabled BOOLEAN DEFAULT FALSE AFTER description;
+ALTER TABLE items ADD INDEX idx_items_disabled (disabled);

@@ -330,7 +330,7 @@ onMounted(async () => {
                 <ItemCard
                   v-for="(rec, index) in visibleRecommendations"
                   :key="rec.itemId"
-                  :item="{ id: rec.itemId, name: rec.name, category: rec.category, imageUrl: rec.imageUrl }"
+                  :item="{ id: rec.itemId, name: rec.name, category: rec.category, imageUrl: rec.imageUrl, price: rec.price }"
                   :reason="rec.reason"
                   meta-label="匹配度"
                   :meta-value="rec.score.toFixed(2)"

@@ -1,24 +1,10 @@
 -- 示例数据：用户、物品、评分
-INSERT INTO users (id, username) VALUES
-  (1, 'alice'),
-  (2, 'bob'),
-  (3, 'carol'),
-  (4, 'dave')
-ON DUPLICATE KEY UPDATE username = VALUES(username);
+-- 注意：商品数据已通过 import_movielens_as_items.sql 从 MovieLens 1M 导入
 
-INSERT INTO items (id, name, category, image_url) VALUES
-  (101, '《算法导论》', 'books', 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=300&fit=crop'),
-  (102, '《Java 编程思想》', 'books', 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400&h=300&fit=crop'),
-  (103, '《机器学习》', 'books', 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop'),
-  (201, '机械键盘', 'electronics', 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&h=300&fit=crop'),
-  (202, '降噪耳机', 'electronics', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop'),
-  (203, '人体工学椅', 'furniture', 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400&h=300&fit=crop')
-ON DUPLICATE KEY UPDATE name = VALUES(name), category = VALUES(category), image_url = VALUES(image_url);
-
--- 评分：0-5
+-- 评分：0-5 (示例数据，实际数据来自 MovieLens ratings.dat)
 INSERT INTO ratings (user_id, item_id, score) VALUES
-  (1, 101, 5), (1, 102, 4), (1, 201, 3),
-  (2, 101, 4), (2, 103, 5), (2, 202, 4),
-  (3, 102, 5), (3, 201, 4), (3, 203, 4),
-  (4, 101, 2), (4, 202, 5), (4, 203, 3)
+  (1, 1, 5), (1, 2, 4), (1, 6, 3),
+  (2, 1, 4), (2, 3, 5), (2, 10, 4),
+  (3, 2, 5), (3, 6, 4), (3, 16, 4),
+  (4, 1, 2), (4, 10, 5), (4, 16, 3)
 ON DUPLICATE KEY UPDATE score = VALUES(score);

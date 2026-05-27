@@ -29,6 +29,10 @@ const safeImage = computed(() => {
 const categoryText = computed(() => props.item.category || '未分类');
 const avgScore = computed(() => Number(props.item.avgScore || 0));
 const ratingCount = computed(() => Number(props.item.ratingCount || 0));
+const priceText = computed(() => {
+  const p = Number(props.item.price || 0);
+  return p > 0 ? `¥${p.toFixed(2)}` : '';
+});
 const favoriteLabel = computed(() => {
   if (props.actionsDisabled) return '登录后收藏';
   return props.favorite ? '已收藏' : '收藏';
@@ -54,6 +58,7 @@ const handleImageError = () => {
         <h3>{{ item.name }}</h3>
         <span class="item-category">{{ categoryText }}</span>
       </div>
+      <div v-if="priceText" class="item-price">{{ priceText }}</div>
       <p v-if="reason" class="item-reason">{{ reason }}</p>
       <div class="item-meta">
         <span v-if="metaLabel" class="meta-pill">{{ metaLabel }} {{ metaValue }}</span>

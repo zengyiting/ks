@@ -9,6 +9,7 @@ public class ItemBasedCF implements RecommenderStrategy {
     private static final int TOP_K_SIMILAR_ITEMS = 20;
     private static final double GLOBAL_MEAN = 3.5;
 
+    // 使用实例变量而非静态变量，避免跨请求缓存问题
     private Map<Long, Map<Long, Double>> similarityCache;
     private int lastUserCount = -1;
     private int lastItemCount = -1;
