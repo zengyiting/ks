@@ -1,9 +1,0 @@
-#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
-#Wed Apr 15 14:20:41 CST 2026
-https\://tone.tcl.com/pkg/devops/maven/maven/snapshot/.error=Could not transfer artifact org.springframework.boot\:spring-boot-starter-parent\:pom\:3.3.2 from/to devops_snapshot_maven_maven (https\://tone.tcl.com/pkg/devops/maven/maven/snapshot/)\: Transfer failed for https\://tone.tcl.com/pkg/devops/maven/maven/snapshot/org/springframework/boot/spring-boot-starter-parent/3.3.2/spring-boot-starter-parent-3.3.2.pom
-https\://tone.tcl.com/mirrors/maven/.error=Could not transfer artifact org.springframework.boot\:spring-boot-starter-parent\:pom\:3.3.2 from/to ezOne-maven (https\://tone.tcl.com/mirrors/maven/)\: Transfer failed for https\://tone.tcl.com/mirrors/maven/org/springframework/boot/spring-boot-starter-parent/3.3.2/spring-boot-starter-parent-3.3.2.pom
-https\://repo.maven.apache.org/maven2/.lastUpdated=1776234041780
-https\://tone.tcl.com/pkg/devops/maven/maven/release/.error=Could not transfer artifact org.springframework.boot\:spring-boot-starter-parent\:pom\:3.3.2 from/to devops_release_maven_maven (https\://tone.tcl.com/pkg/devops/maven/maven/release/)\: Transfer failed for https\://tone.tcl.com/pkg/devops/maven/maven/release/org/springframework/boot/spring-boot-starter-parent/3.3.2/spring-boot-starter-parent-3.3.2.pom
-@default-ezOne-maven-https\://tone.tcl.com/mirrors/maven/.lastUpdated=1776097763553
-bca239bc07f0ee877f0281395fb7d50cb6880680@default-devops_release_maven_maven-https\://tone.tcl.com/pkg/devops/maven/maven/release/.lastUpdated=1776097763547
-bca239bc07f0ee877f0281395fb7d50cb6880680@default-devops_snapshot_maven_maven-https\://tone.tcl.com/pkg/devops/maven/maven/snapshot/.lastUpdated=1776097763525
